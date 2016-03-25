@@ -4,11 +4,10 @@ module.exports = {
     url: "https://github.com/joyeecheung"
   },
   repo: {  // for the markdown source
-    content: "https://github.com/joyeecheung/my-tech-diary",
+    content: "https://github.com/zxc0328/diary-content",
     as_submodule: 'diary'
   },
-  base_url: '/diary',  // remote directory for the website
-  ga_id: 'UA-63818301-1',  // Optional: Universal Google Analytics ID
-  title: 'My Tech Diary',
+  base_url: '/diary',  // remote directory for the website  
+  title: 'Zindex\'s Tech Diary',
   lang: 'en'
 }
