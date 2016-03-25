@@ -1,0 +1,99 @@
+<!DOCTYPE html><!--[if lte IE 8]>
+<html lang="en" class="lte-ie8">
+<![endif]-->
+<!--[if gt IE 8]><!-->
+<html lang="en">
+<!--<![endif]--><head><meta charset="utf-8"><title>March 25, 2016</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="stylesheet" href="/diary/styles/global.css"><link rel="stylesheet" href="/diary/styles/tomorrow.css"><link rel="stylesheet" href="/diary/styles/diary.css"></head><body><header class="header"><div class="index"><a href="/diary/">Index</a></div><h1>March 25, 2016</h1></header><div class="content"><div class="diary"><h2 id="double-and-add-algorithm">Double and add algorithm</h2>
+<p>The &quot;famous&quot; left-pad npm package has cause some intensive discusstion on social network among developers. </p>
+<p>Many people notice that the  algorithm used in the package is not so good.</p>
+<h3 id="original-solution">Original solution</h3>
+<p>The original left-pad code:</p>
+<pre><code>function leftpad (<span class="hljs-keyword">str</span>, len, <span class="hljs-number">ch</span>) {
+  <span class="hljs-keyword">str</span> = String(<span class="hljs-keyword">str</span>)<span class="hljs-comment">;</span>
+
+  var i = -<span class="hljs-number">1</span><span class="hljs-comment">;</span>
+
+  if (!<span class="hljs-number">ch</span> &amp;&amp; <span class="hljs-number">ch</span> !== <span class="hljs-number">0</span>) <span class="hljs-number">ch</span> = <span class="hljs-string">" "</span><span class="hljs-comment">;</span>
+
+  len = len - <span class="hljs-keyword">str</span>.length<span class="hljs-comment">;</span>
+
+  while (++i &lt; len) {
+    <span class="hljs-keyword">str</span> = <span class="hljs-number">ch</span> + <span class="hljs-keyword">str</span><span class="hljs-comment">;</span>
+  }
+
+  return <span class="hljs-keyword">str</span><span class="hljs-comment">;</span>
+}
+</code></pre><p>This algorithm has a complexity of O(n). </p>
+<h3 id="a-better-solution">A better solution</h3>
+<p>And someone brought up a O(log(n)) solution:</p>
+<pre><code>function leftpad(<span class="hljs-keyword">str</span>, len, <span class="hljs-number">ch</span>){
+  <span class="hljs-keyword">str</span> = <span class="hljs-string">""</span> + <span class="hljs-keyword">str</span><span class="hljs-comment">;</span>
+  if(!<span class="hljs-number">ch</span> &amp;&amp; <span class="hljs-number">ch</span> !== <span class="hljs-number">0</span>) <span class="hljs-number">ch</span> = <span class="hljs-string">" "</span><span class="hljs-comment">;</span>
+
+  var padlen = len - <span class="hljs-keyword">str</span>.length<span class="hljs-comment">;</span>
+  if(padlen &lt;= <span class="hljs-number">0</span>) return <span class="hljs-keyword">str</span><span class="hljs-comment">;</span>
+
+  var padch = padlen &amp; <span class="hljs-number">1</span> ? <span class="hljs-number">ch</span> : <span class="hljs-string">""</span><span class="hljs-comment">;</span>
+
+  while(padlen &gt;&gt;= <span class="hljs-number">1</span>){
+    <span class="hljs-number">ch</span> += <span class="hljs-number">ch</span><span class="hljs-comment">;</span>
+    if(padlen &amp; <span class="hljs-number">1</span>){
+        padch += <span class="hljs-number">ch</span><span class="hljs-comment">;</span>
+    }
+  }
+  return padch + <span class="hljs-keyword">str</span><span class="hljs-comment">;</span>
+}
+</code></pre><h3 id="double-and-add-algorithm">Double and add algorithm</h3>
+<p>This infamous algorithm used here can be called double and add algorithm, or exponentiation by squaring. </p>
+<p>The key point here is to treat string concatenation as mutiplying strings all together, NOT addition.</p>
+<p>So we have this recursion formula:</p>
+<p><img src="https://upload.wikimedia.org/math/a/9/9/a99eb157482b37137bceac54af762eb1.png" alt="recursion formula"></p>
+<p>And the algorithm here can be described as:</p>
+<pre><code><span class="hljs-literal">f</span>(P, <span class="hljs-keyword">n</span>) is
+     <span class="hljs-keyword">if</span> <span class="hljs-keyword">n</span> = 0 then
+         <span class="hljs-keyword">return</span> 0                        # computation complete
+     <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> <span class="hljs-keyword">n</span> = 1 then
+         <span class="hljs-keyword">return</span> P
+     <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> <span class="hljs-keyword">n</span> mod 2 = 1 then
+        <span class="hljs-keyword">return</span> point_add(P, <span class="hljs-literal">f</span>(P, <span class="hljs-keyword">n</span> - 1)) # addition when <span class="hljs-keyword">n</span> is odd
+     <span class="hljs-keyword">else</span>
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">f</span>(point_double(P), <span class="hljs-keyword">n</span>/2)   # doubling when <span class="hljs-keyword">n</span> is even
+</code></pre><p>Or using loop rather than recursion</p>
+<pre><code>Q ← <span class="hljs-number">0</span>
+  <span class="hljs-keyword">for</span> <span class="hljs-tag">i</span> from <span class="hljs-number">0</span> to m do
+     <span class="hljs-keyword">if</span> di = <span class="hljs-number">1</span> then
+         Q ← <span class="hljs-function"><span class="hljs-title">point_add</span><span class="hljs-params">(Q, P)</span></span>
+     P ← <span class="hljs-function"><span class="hljs-title">point_double</span><span class="hljs-params">(P)</span></span>
+  return Q
+</code></pre><p>So the maxim times of loop here is <img src="https://upload.wikimedia.org/math/5/0/9/5096155f8cc9f6ee9aa628d0ead19a03.png" alt="log(n)">. Because that&#39;s the maxim bits of n&#39;s binary form.</p>
+<p>So if n equals 947. 947 = 2^9+2^8+2^7+2^5+2^4+2^1+2^0. Thats 9 doublings and 6 additions, much better than 946 additions....</p>
+<h3 id="real-world-example">Real-world example</h3>
+<p><code>_.repeat</code> in Lo-dash:</p>
+<pre><code>function repeat(<span class="hljs-type">string</span>, n) {
+      <span class="hljs-type">string</span> = toString(<span class="hljs-type">string</span>);
+      n = toInteger(n);
+
+      <span class="hljs-keyword">var</span> <span class="hljs-literal">result</span> = '';
+      <span class="hljs-keyword">if</span> (!<span class="hljs-type">string</span> || n &lt; <span class="hljs-number">1</span> || n &gt; <span class="hljs-type">MAX_SAFE_INTEGER</span>) {
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">result</span>;
+      }
+      // <span class="hljs-type">Leverage</span> the exponentiation by squaring algorithm <span class="hljs-keyword">for</span> a faster repeat.
+      // <span class="hljs-type">See</span> https://en.wikipedia.org/wiki/<span class="hljs-type">Exponentiation_by_squaring</span> <span class="hljs-keyword">for</span> more details.
+      <span class="hljs-keyword">do</span> {
+        <span class="hljs-keyword">if</span> (n % <span class="hljs-number">2</span>) {
+          <span class="hljs-literal">result</span> += <span class="hljs-type">string</span>;
+        }
+        n = nativeFloor(n / <span class="hljs-number">2</span>);
+        <span class="hljs-type">string</span> += <span class="hljs-type">string</span>;
+      } <span class="hljs-keyword">while</span> (n);
+
+      <span class="hljs-keyword">return</span> <span class="hljs-literal">result</span>;
+    }
+</code></pre><h3 id="links">Links</h3>
+<ul>
+<li><a href="http://hyperelliptic.blogspot.com/2009/06/double-and-add-algorithm.html">Double and Add algorithm</a></li>
+<li><a href="https://en.wikipedia.org/wiki/Exponentiation_by_squaring">Exponentiation by squaring</a></li>
+<li><a href="https://github.com/lodash/lodash/blob/4.6.1/lodash.js#L12726">Source of <code>_.repeat</code> in Lo-dash</a></li>
+<li><a href="http://blog.h5jun.com/post/left-pad.html">由NPM引发的关于left-pad的那些事儿</a></li>
+</ul>
+</div></div><footer class="footer"><address class="author">Copyright &copy;<a rel="author" href="https://github.com/joyeecheung" class="author-name">Joyee Cheung</a>-<a href="https://github.com/zxc0328/diary-content" class="source-repo">Source</a></address><p>Generated by<a href="https://github.com/joyeecheung/diary" class="site-repo">Joyee Cheung&#39;s diary generator</a></p></footer></body></html>
