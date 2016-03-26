@@ -1,7 +1,7 @@
 module.exports = {
   author: {
-    name: "Joyee Cheung",
-    url: "https://github.com/joyeecheung"
+    name: "Zindex",
+    url: "https://github.com/zindex"
   },
   repo: {  // for the markdown source
     content: "https://github.com/zxc0328/diary-content",
