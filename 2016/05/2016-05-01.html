@@ -1,0 +1,120 @@
+<!DOCTYPE html><!--[if lte IE 8]>
+<html lang="en" class="lte-ie8">
+<![endif]-->
+<!--[if gt IE 8]><!-->
+<html lang="en">
+<!--<![endif]--><head><meta charset="utf-8"><title>May 1, 2016</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="stylesheet" href="/diary/styles/global.css"><link rel="stylesheet" href="/diary/styles/tomorrow.css"><link rel="stylesheet" href="/diary/styles/diary.css"></head><body><header class="header"><div class="index"><a href="/diary/">Index</a></div><h1>May 1, 2016</h1></header><div class="content"><div class="diary"><h2 id="jquery-">jQuery源码阅读笔记（二）</h2>
+<h3 id="-jquery-merge-"><code>jQuery.merge()</code></h3>
+<p>这个函数的在jQuery的源码中出现的频率很高，其实源代码很简单：</p>
+<pre><code>merge: function( <span class="hljs-keyword">first</span>, <span class="hljs-keyword">second</span> ) {
+        var len = +<span class="hljs-keyword">second</span>.<span class="hljs-property">length</span>,
+            j = <span class="hljs-number">0</span>,
+            i = <span class="hljs-keyword">first</span>.<span class="hljs-property">length</span>;
+
+        <span class="hljs-keyword">for</span> ( ; j &lt; len; j++ ) {
+            <span class="hljs-keyword">first</span>[ i++ ] = <span class="hljs-keyword">second</span>[ j ];
+        }
+
+        <span class="hljs-keyword">first</span>.<span class="hljs-property">length</span> = i;
+<span class="hljs-command">
+        return</span> <span class="hljs-keyword">first</span>;
+    }
+</code></pre><p>作用就是把第一个类数组对象和第二个类数组对象合并成一个。这个函数有时候被用来从原生的<code>NodeList</code>类型的DOM集合生成jQuery对象。比如：</p>
+<pre><code>var domCollection = document.querySelectorAll(<span class="hljs-string">'li'</span>);
+var <span class="hljs-variable">$obj</span> = jQuery.merge(constructor(), domCollection);
+</code></pre><p>只要是两个对象都是有<code>length</code>属性的类数组对象，就可以用这个方法来合并。</p>
+<h3 id="-jquery-extend-"><code>jQuery.extend()</code></h3>
+<p>代码如下：</p>
+<pre><code>jQuery.extend = jQuery.fn.extend = function() {
+    var <span class="hljs-keyword">options</span>, name, src, <span class="hljs-keyword">copy</span>, copyIsArray, clone,
+        target = arguments[ <span class="hljs-number">0</span> ] || {},
+        i = <span class="hljs-number">1</span>,
+        length = arguments.length,
+        deep = <span class="hljs-keyword">false</span>;
+
+    <span class="hljs-comment">// Handle a deep copy situation</span>
+    <span class="hljs-keyword">if</span> ( typeof target === <span class="hljs-string">"boolean"</span> ) {
+        deep = target;
+
+        <span class="hljs-comment">// Skip the boolean and the target</span>
+        target = arguments[ i ] || {};
+        i++;
+    }
+
+    <span class="hljs-comment">// Handle case when target is a string or something (possible in deep copy)</span>
+    <span class="hljs-keyword">if</span> ( typeof target !== <span class="hljs-string">"object"</span> &amp;&amp; !jQuery.isFunction( target ) ) {
+        target = {};
+    }
+
+    <span class="hljs-comment">// Extend jQuery itself if only one argument is passed</span>
+    <span class="hljs-keyword">if</span> ( i === length ) {
+        target = <span class="hljs-keyword">this</span>;
+        i--;
+    }
+
+    <span class="hljs-keyword">for</span> ( ; i &lt; length; i++ ) {
+
+        <span class="hljs-comment">// Only deal with non-null/undefined values</span>
+        <span class="hljs-keyword">if</span> ( ( <span class="hljs-keyword">options</span> = arguments[ i ] ) != <span class="hljs-keyword">null</span> ) {
+
+            <span class="hljs-comment">// Extend the base object</span>
+            <span class="hljs-keyword">for</span> ( name in <span class="hljs-keyword">options</span> ) {
+                src = target[ name ];
+                <span class="hljs-keyword">copy</span> = <span class="hljs-keyword">options</span>[ name ];
+
+                <span class="hljs-comment">// Prevent never-ending loop</span>
+                <span class="hljs-keyword">if</span> ( target === <span class="hljs-keyword">copy</span> ) {
+                    <span class="hljs-keyword">continue</span>;
+                }
+
+                <span class="hljs-comment">// Recurse if we're merging plain objects or arrays</span>
+                <span class="hljs-keyword">if</span> ( deep &amp;&amp; <span class="hljs-keyword">copy</span> &amp;&amp; ( jQuery.isPlainObject( <span class="hljs-keyword">copy</span> ) ||
+                    ( copyIsArray = jQuery.isArray( <span class="hljs-keyword">copy</span> ) ) ) ) {
+
+                    <span class="hljs-keyword">if</span> ( copyIsArray ) {
+                        copyIsArray = <span class="hljs-keyword">false</span>;
+                        clone = src &amp;&amp; jQuery.isArray( src ) ? src : [];
+
+                    } <span class="hljs-keyword">else</span> {
+                        clone = src &amp;&amp; jQuery.isPlainObject( src ) ? src : {};
+                    }
+
+                    <span class="hljs-comment">// Never move original objects, clone them</span>
+                    target[ name ] = jQuery.extend( deep, clone, <span class="hljs-keyword">copy</span> );
+
+                <span class="hljs-comment">// Don't bring in undefined values</span>
+                } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> ( <span class="hljs-keyword">copy</span> !== undefined ) {
+                    target[ name ] = <span class="hljs-keyword">copy</span>;
+                }
+            }
+        }
+    }
+
+    <span class="hljs-comment">// Return the modified object</span>
+    <span class="hljs-keyword">return</span> target;
+};
+</code></pre><p><code>extend</code>其实就是一个支持deep copy的mixin函数。</p>
+<h3 id="-jquery-each-"><code>jQuery.each()</code></h3>
+<p>源码：</p>
+<pre><code>each: <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">( obj, callback )</span> </span>{
+        <span class="hljs-keyword">var</span> length, i = <span class="hljs-number">0</span>;
+
+        <span class="hljs-keyword">if</span> ( isArrayLike( obj ) ) {
+            length = obj.length;
+            <span class="hljs-keyword">for</span> ( ; i &lt; length; i++ ) {
+                <span class="hljs-keyword">if</span> ( <span class="hljs-keyword">callback</span>.call( obj[ i ], i, obj[ i ] ) === <span class="hljs-literal">false</span> ) {
+                    <span class="hljs-keyword">break</span>;
+                }
+            }
+        } <span class="hljs-keyword">else</span> {
+            <span class="hljs-keyword">for</span> ( i <span class="hljs-keyword">in</span> obj ) {
+                <span class="hljs-keyword">if</span> ( <span class="hljs-keyword">callback</span>.call( obj[ i ], i, obj[ i ] ) === <span class="hljs-literal">false</span> ) {
+                    <span class="hljs-keyword">break</span>;
+                }
+            }
+        }
+
+        <span class="hljs-keyword">return</span> obj;
+    }
+</code></pre><p>一个迭代器，其中的处理分两种情况。如果对象是类数组，则使用<code>length</code>遍历。如果是普通对象，则使用<code>for in</code>循环。</p>
+</div></div><footer class="footer"><address class="author">Copyright &copy;<a rel="author" href="https://github.com/zindex" class="author-name">Zindex</a>-<a href="https://github.com/zxc0328/diary-content" class="source-repo">Source</a></address><p>Generated by<a href="https://github.com/joyeecheung/diary" class="site-repo">Joyee Cheung&#39;s diary generator</a></p></footer></body></html>
