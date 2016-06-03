@@ -1,0 +1,72 @@
+<!DOCTYPE html><!--[if lte IE 8]>
+<html lang="en" class="lte-ie8">
+<![endif]-->
+<!--[if gt IE 8]><!-->
+<html lang="en">
+<!--<![endif]--><head><meta charset="utf-8"><title>May 30, 2016</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="stylesheet" href="/diary/styles/global.css"><link rel="stylesheet" href="/diary/styles/tomorrow.css"><link rel="stylesheet" href="/diary/styles/diary.css"></head><body><header class="header"><div class="index"><a href="/diary/">Index</a></div><h1>May 30, 2016</h1></header><div class="content"><div class="diary"><h2 id="nodejs-require-">Nodejs require() 原理</h2>
+<h3 id="module-">Module构造函数</h3>
+<p>一个模块就是一个Module实例，这是<code>Module()</code>构造函数。这个构造函数定义了一些module实例的属性，如<code>module.exports</code>，<code>module.parent</code>等等。</p>
+<pre><code><span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">Module</span><span class="hljs-params">(id, parent)</span> </span>{
+  <span class="hljs-keyword">this</span>.id = id;
+  <span class="hljs-keyword">this</span>.exports = {};
+  <span class="hljs-keyword">this</span>.parent = parent;
+  <span class="hljs-keyword">if</span> (parent &amp;&amp; parent.children) {
+    parent.children.push(<span class="hljs-keyword">this</span>);
+  }
+
+  <span class="hljs-keyword">this</span>.filename = <span class="hljs-literal">null</span>;
+  <span class="hljs-keyword">this</span>.loaded = <span class="hljs-literal">false</span>;
+  <span class="hljs-keyword">this</span>.children = [];
+}
+</code></pre><h3 id="-module-_load-module-prototype-_compile-"><code>Module._load</code> &amp;&amp; <code>Module.prototype._compile</code></h3>
+<pre><code>Module.prototype.<span class="hljs-built_in">require</span> = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(path)</span></span> {
+  <span class="hljs-built_in">assert</span>(path, <span class="hljs-string">'missing path'</span>);
+  <span class="hljs-built_in">assert</span>(typeof path === <span class="hljs-string">'string'</span>, <span class="hljs-string">'path must be a string'</span>);
+  <span class="hljs-keyword">return</span> Module._load(path, this, <span class="hljs-keyword">false</span>);
+};
+</code></pre><p><code>require()</code>这个函数实际上调用了<code>Module._load</code>内部方法，那我们来看看这个方法</p>
+<pre><code>Module._load = <span class="hljs-function"><span class="hljs-keyword">function</span>(<span class="hljs-params">request, parent, isMain</span>) </span>{
+
+  <span class="hljs-comment">// 按文件名解析模块</span>
+  <span class="hljs-keyword">var</span> filename = Module._resolveFilename(request, parent);
+
+  <span class="hljs-keyword">var</span> cachedModule = Module._cache[filename];
+  <span class="hljs-keyword">if</span> (cachedModule) {
+    <span class="hljs-keyword">return</span> cachedModule.exports;
+  }
+
+  <span class="hljs-keyword">if</span> (NativeModule.nonInternalExists(filename)) {
+    debug(<span class="hljs-string">'load native module %s'</span>, request);
+    <span class="hljs-keyword">return</span> NativeModule.require(filename);
+  }
+
+  <span class="hljs-comment">// 创建一个新module实例</span>
+  <span class="hljs-keyword">var</span> <span class="hljs-built_in">module</span> = <span class="hljs-keyword">new</span> Module(filename, parent);
+
+  <span class="hljs-comment">// 加载模块</span>
+  <span class="hljs-keyword">try</span> {
+    <span class="hljs-built_in">module</span>.load(filename);
+    hadException = <span class="hljs-literal">false</span>;
+  } <span class="hljs-keyword">finally</span> {
+    <span class="hljs-keyword">if</span> (hadException) {
+      <span class="hljs-keyword">delete</span> Module._cache[filename];
+    }
+  }
+
+  <span class="hljs-comment">// 返回module实例的exports对象</span>
+  <span class="hljs-keyword">return</span> <span class="hljs-built_in">module</span>.exports;
+};
+</code></pre><p>这个方法的代码比较长，我保留了一部分。<code>Module._load</code>所做的事情便是加载模块的JavaScript代码，然后新建一个模块实例，将加载的代码在模块实例环境下运行之，然后返回运行之后模块上的exports对象。</p>
+<p>其中关键点是将加载的代码运行。这个是在<code>module.load(filename);</code>中实现的。<code>module.load</code>是一个类方法，源码在<code>Module.prototype.load</code>，其中又调用了<code>Module._extensions[&#39;.js&#39;]</code>其中调用了<code>Module.prototype._compile</code>。这个方法所做的事情是，讲JS代码放在</p>
+<pre><code>'(<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(exports, require, module, __filename, __dirname)</span> {</span> ',
+  '\n});'
+</code></pre><p>这个字符串中执行，也就是放在一个函数表达式中执行。函数表达式创建了作用域，使得在模块中访问到的<code>exports</code>，<code>module</code>对象与当前实例对应，与其他实例隔离。</p>
+<p>这段代码运行之后，<code>module.exports</code>对象就是我们在模块代码中赋值给<code>module.exports</code>的对象了。</p>
+<p>最后<code>module.exports</code>被<code>Module._load</code>返回，我们<code>require</code>得到的就是模块代码运行后赋值给<code>module.exports</code>的对象。</p>
+<h3 id="links">Links</h3>
+<ul>
+<li><a href="http://alinode.aliyun.com/blog/35">一个文件被require后所发生的故事</a></li>
+<li><a href="http://www.ruanyifeng.com/blog/2015/05/require.html">require() 源码解读</a></li>
+<li><a href="http://fredkschott.com/post/2014/06/require-and-the-module-system/">http://fredkschott.com/post/2014/06/require-and-the-module-system/</a></li>
+</ul>
+</div></div><footer class="footer"><address class="author">Copyright &copy;<a rel="author" href="https://github.com/zindex" class="author-name">Zindex</a>-<a href="https://github.com/zxc0328/diary-content" class="source-repo">Source</a></address><p>Generated by<a href="https://github.com/joyeecheung/diary" class="site-repo">Joyee Cheung&#39;s diary generator</a></p></footer></body></html>
