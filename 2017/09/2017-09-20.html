@@ -1,0 +1,90 @@
+<!DOCTYPE html><!--[if lte IE 8]>
+<html lang="en" class="lte-ie8">
+<![endif]-->
+<!--[if gt IE 8]><!-->
+<html lang="en">
+<!--<![endif]--><head><meta charset="utf-8"><title>September 20, 2017</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="stylesheet" href="/diary/styles/global.css"><link rel="stylesheet" href="/diary/styles/tomorrow.css"><link rel="stylesheet" href="/diary/styles/diary.css"></head><body><header class="header"><div class="index"><a href="/diary/">Index</a></div><h1>September 20, 2017</h1></header><div class="content"><div class="diary"><h2 id="regular-template-parsing">Regular Template Parsing</h2>
+<blockquote>
+<p>之前想写一篇《自制Regular模板解析器》的博客，但发现思路不是很清晰，所以先在这里记一下笔记。</p>
+</blockquote>
+<p>Regular的parser是一个简单的LL(1) parser。里面的Token有：</p>
+<pre><code>TEXT
+NAME
+UNQ
+TAG_OPEN
+TAG_CLOSE
+<span class="hljs-literal">STRING</span>
+<span class="hljs-keyword">OPEN</span>
+<span class="hljs-keyword">CLOSE</span>
+</code></pre><h3 id="lexer">Lexer</h3>
+<p>Lexer里有一个细节，就是Regular里可以定义表达式里标志开始和结束的Symbol。所以Rule里面的正则表达式是需要经过替换才能使用的。替换的对象就是macro。</p>
+<p>Lexer里有一些macro，就是预定义的正则。</p>
+<p>macro里面的IDENT是identifier的意思。</p>
+<p>BEGIN和END是可以由用户定义的macro。</p>
+<p>这种机制提供了简单的抽象和灵活度。</p>
+<h3 id="regular-ast-design">Regular AST Design</h3>
+<p>节点的定义在<em>parser/node.js</em>里面。值得一提的是：</p>
+<ul>
+<li><code>element</code>类型，代表一个XML元素或者是一个自定义元素（Regular组件）。</li>
+<li><code>expression</code>类型，Regular模板的特色，基本支持了ES5的JS表达式。这个类型编译出的AST节点主要包含的是以字符串的形式保存的get和set两个JS表达式，这两个表达式被放在<code>body</code>属性里。在后续遍历AST的时候会生成最后的表达式对象。</li>
+<li><code>if</code>和<code>list</code>这些directive。语法源于JST模板中的流程控制。拿<code>if</code>举例，编译出的有一个<code>test</code>表达式，还有<code>consequent</code>和<code>alternate</code>，里面保存的是任意的AST节点。</li>
+</ul>
+<h3 id="ebnf-">EBNF（待完善）</h3>
+<p>(大写的常量是非终结符)</p>
+<pre><code>statement <span class="hljs-subst">-&gt; </span><span class="hljs-built_in">xml</span> | jst | text
+program <span class="hljs-subst">-&gt; </span>EOF | (statement)* EOF
+<span class="hljs-built_in">xml</span> <span class="hljs-subst">-&gt; </span>stag statement* TAG_CLOSE?
+stag <span class="hljs-subst">-&gt; </span><span class="hljs-string">'&lt;'</span> Name (S attr)* S? <span class="hljs-string">'&gt;'</span>  
+attr <span class="hljs-subst">-&gt; </span>Name <span class="hljs-literal">Eq</span> attvalue
+attvalue <span class="hljs-subst">-&gt; </span><span class="hljs-built_in">STRING</span> | NAME
+assign <span class="hljs-subst">-&gt; </span>left<span class="hljs-attribute">-hand</span><span class="hljs-attribute">-expr</span> (<span class="hljs-preprocessor">[</span><span class="hljs-string">'='</span>, <span class="hljs-string">'+='</span>, <span class="hljs-string">'-='</span>, <span class="hljs-string">'*='</span>, <span class="hljs-string">'/='</span>, <span class="hljs-string">'%='</span><span class="hljs-preprocessor">]</span><span class="hljs-markup"> condition)?
+condition -&gt; or (? assign : assign)*</span>
+</code></pre><h3 id="parser-">Parser细节</h3>
+<p>要注意的是，<code>expression</code>类型的AST节点，内部的节点树不会被保存，而是直接转换为一个JS字符串。从这个角度上来说，<code>expression</code>向下的递归解析，其实同时做了翻译的工作。</p>
+<p>Regular的Parser把expression一下的语法单元，都表示为统一的对象格式:</p>
+<pre><code><span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">getset</span><span class="hljs-params">(get, set)</span></span>{
+  <span class="hljs-keyword">return</span> {
+    <span class="hljs-keyword">get</span>: <span class="hljs-keyword">get</span>,
+    <span class="hljs-keyword">set</span>: <span class="hljs-keyword">set</span>
+  }
+}
+</code></pre><p>通过这个函数，返回一个有get和set属性的对象。</p>
+<p><code>expression</code>中的语法单元可以分为Left Hand Side和Right Hand Side，在Regular parser中，Left Hand Side Expression有get和set两个属性，而Right Hand Side Expression则只能get。</p>
+<p>可以想见，多个Right Hand Side的语法单元，递归下降返回时的合并，只要讲这些语法单元的get方法调用，然后加上中间的运算符就可以了。比如这样：</p>
+<pre><code><span class="hljs-comment">// relation</span>
+<span class="hljs-comment">// </span>
+<span class="hljs-comment">// equal == relation</span>
+<span class="hljs-comment">// equal != relation</span>
+<span class="hljs-comment">// equal === relation</span>
+<span class="hljs-comment">// equal !== relation</span>
+op.equal = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">()</span></span>{
+  <span class="hljs-keyword">var</span> left = <span class="hljs-keyword">this</span>.relation(), ll;
+  <span class="hljs-comment">// @perf;</span>
+  <span class="hljs-keyword">if</span>( ll = <span class="hljs-keyword">this</span>.eat([<span class="hljs-string">'=='</span>,<span class="hljs-string">'!='</span>, <span class="hljs-string">'==='</span>, <span class="hljs-string">'!=='</span>])){
+    <span class="hljs-keyword">return</span> getset(left.<span class="hljs-keyword">get</span> + ll.type + <span class="hljs-keyword">this</span>.equal().<span class="hljs-keyword">get</span>);
+  }
+  <span class="hljs-keyword">return</span> left
+}
+<span class="hljs-comment">// relation &lt; additive</span>
+<span class="hljs-comment">// relation &gt; additive</span>
+<span class="hljs-comment">// relation &lt;= additive</span>
+<span class="hljs-comment">// relation &gt;= additive</span>
+<span class="hljs-comment">// relation in additive</span>
+op.relation = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">()</span></span>{
+  <span class="hljs-keyword">var</span> left = <span class="hljs-keyword">this</span>.additive(), ll;
+  <span class="hljs-comment">// @perf</span>
+  <span class="hljs-keyword">if</span>(ll = (<span class="hljs-keyword">this</span>.eat([<span class="hljs-string">'&lt;'</span>, <span class="hljs-string">'&gt;'</span>, <span class="hljs-string">'&gt;='</span>, <span class="hljs-string">'&lt;='</span>]) || <span class="hljs-keyword">this</span>.eat(<span class="hljs-string">'IDENT'</span>, <span class="hljs-string">'in'</span>) )){
+    <span class="hljs-keyword">return</span> getset(left.<span class="hljs-keyword">get</span> + ll.value + <span class="hljs-keyword">this</span>.relation().<span class="hljs-keyword">get</span>);
+  }
+  <span class="hljs-keyword">return</span> left
+}
+</code></pre><p>递归下降的顺序来源于JS中的运算符优先级。优先级越高的在解析时层级越深。</p>
+<h3 id="fliter-">fliter的解析</h3>
+<h3 id="assignment-">assignment的解析</h3>
+<h3 id="-">优化备忘：</h3>
+<ul>
+<li>Vue的环境变量，不同环境特定的warn代码</li>
+<li>AOT</li>
+<li>类似React的ShouldComponentUpdate一样的一个生命周期函数</li>
+</ul>
+</div></div><footer class="footer"><address class="author">Copyright &copy;<a rel="author" href="https://github.com/zindex" class="author-name">Zindex</a>-<a href="https://github.com/zxc0328/diary-content" class="source-repo">Source</a></address><p>Generated by<a href="https://github.com/joyeecheung/diary" class="site-repo">Joyee Cheung&#39;s diary generator</a></p></footer></body></html>
