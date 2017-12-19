@@ -1,0 +1,54 @@
+<!DOCTYPE html><!--[if lte IE 8]>
+<html lang="en" class="lte-ie8">
+<![endif]-->
+<!--[if gt IE 8]><!-->
+<html lang="en">
+<!--<![endif]--><head><meta charset="utf-8"><title>December 16, 2017</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="stylesheet" href="/diary/styles/global.css"><link rel="stylesheet" href="/diary/styles/tomorrow.css"><link rel="stylesheet" href="/diary/styles/diary.css"></head><body><header class="header"><div class="index"><a href="/diary/">Index</a></div><h1>December 16, 2017</h1></header><div class="content"><div class="diary"><h2 id="headless-chrome-long-image-capture-issue">Headless Chrome long image capture issue</h2>
+<h3 id="the-problem">The problem</h3>
+<p>Recently I had received complaint about my capture service not export complete image. It seems that this problem only occurs when the page&#39;s is extremely long.</p>
+<p>The broken image is like this:</p>
+<p><img src="https://raw.githubusercontent.com/zxc0328/huihuihui-h5/master/Screen%20Shot%202017-12-19%20at%2010.30.21%20AM.png" alt="broken"></p>
+<h3 id="chromium-s-limit">Chromium&#39;s limit</h3>
+<p>So I Googled for the problem and I found <a href="https://github.com/GoogleChrome/puppeteer/issues/477">a lot issues</a> on Github that target the same problem. When reading throught <a href="https://github.com/GoogleChrome/puppeteer/pull/937">this issue</a>, I got the fact that this problem is caused by Chromium&#39;s limit.</p>
+<p>Since normal server don&#39;t have a GPU inside, Headless Chrome had to use software renderer, that is, using CPU to calculate the pixels. </p>
+<p>Chromium&#39;s compositor has a maximum texture size when using software GL backend, this limit is 16384px. So large image will not be renderer completely.</p>
+<h3 id="how-to-solve-it">How to solve it</h3>
+<p>The solve for this problem is simple. Cut the page into pieces, capture these fragments in order, and composite those pieces into a whole image.</p>
+<p>The code below use Puppeteer&#39;s API, it&#39;s fine to replace it with other library like CDP.</p>
+<pre><code>await page.setViewport({ <span class="hljs-variable">width</span>: <span class="hljs-number">1440</span>, <span class="hljs-variable">height</span>: <span class="hljs-number">1024</span>});
+<span class="hljs-keyword">const</span> {contentSize} = await page._client.send(<span class="hljs-string">'Page.getLayoutMetrics'</span>);
+<span class="hljs-comment">// MAGIC NUMBER, DO NOT MODIFIY THIS OR YOU WILL BE FIRED</span>
+<span class="hljs-keyword">const</span> maxScreenshotHeight = <span class="hljs-number">7000</span>;
+          <span class="hljs-keyword">if</span> (contentSize.<span class="hljs-variable">height</span> &gt;= maxScreenshotHeight) {
+
+            let <span class="hljs-built_in">image</span>;
+            let lastBuffer;
+
+            <span class="hljs-keyword">for</span> (let ypos = <span class="hljs-number">0</span>; ypos &lt; contentSize.<span class="hljs-variable">height</span>; ypos += maxScreenshotHeight) {
+              <span class="hljs-keyword">const</span> <span class="hljs-variable">height</span> = Math.<span class="hljs-built_in">min</span>(contentSize.<span class="hljs-variable">height</span> - ypos, maxScreenshotHeight);
+              let buffer = await page.screenshot({
+                clip: {
+                  x: <span class="hljs-number">0</span>,
+                  y: ypos,
+                  <span class="hljs-variable">width</span>: contentSize.<span class="hljs-variable">width</span>,
+                  <span class="hljs-variable">height</span>
+                }
+              });
+              <span class="hljs-keyword">if</span> (ypos === <span class="hljs-number">0</span>) {
+                <span class="hljs-built_in">image</span> = sharp(buffer);
+                lastBuffer = await <span class="hljs-built_in">image</span>.toBuffer();
+              }<span class="hljs-keyword">else</span> {
+                <span class="hljs-built_in">image</span> = sharp(lastBuffer);
+                <span class="hljs-built_in">image</span> = <span class="hljs-built_in">image</span>.extend({top: <span class="hljs-number">0</span>, bottom: <span class="hljs-variable">height</span>, left: <span class="hljs-number">0</span>, right: <span class="hljs-number">0</span>})
+                <span class="hljs-built_in">image</span> = <span class="hljs-built_in">image</span>.overlayWith(buffer, {top: ypos, left:<span class="hljs-number">0</span>})
+                lastBuffer = await <span class="hljs-built_in">image</span>.toBuffer();
+              }
+            }
+            fileData = lastBuffer;
+</code></pre><p>I use <a href="https://github.com/lovell/sharp">sharp</a> for image processing, bacause it&#39;s recommended on Github issue.</p>
+<blockquote>
+<p>The magic number here should be around 16000 by default, but I had noticed that the height for each piece should be reduced when the width increased. The width I use for my capture is 1440px, you should start from 16000 and reduce this number if the image exported is still incomplete.</p>
+</blockquote>
+<h3 id="future">Future</h3>
+<p>The approach may not be necessary accroding to this <a href="https://bugs.chromium.org/p/chromium/issues/detail?id=770769">Chromium issue</a>.</p>
+</div></div><footer class="footer"><address class="author">Copyright &copy;<a rel="author" href="https://github.com/zindex" class="author-name">Zindex</a>-<a href="https://github.com/zxc0328/diary-content" class="source-repo">Source</a></address><p>Generated by<a href="https://github.com/joyeecheung/diary" class="site-repo">Joyee Cheung&#39;s diary generator</a></p></footer></body></html>
