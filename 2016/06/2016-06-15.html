@@ -3,7 +3,13 @@
 <![endif]-->
 <!--[if gt IE 8]><!-->
 <html lang="en">
-<!--<![endif]--><head><meta charset="utf-8"><title>June 15, 2016</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="stylesheet" href="/diary/styles/global.css"><link rel="stylesheet" href="/diary/styles/tomorrow.css"><link rel="stylesheet" href="/diary/styles/diary.css"></head><body><header class="header"><div class="index"><a href="/diary/">Index</a></div><h1>June 15, 2016</h1></header><div class="content"><div class="diary"><h2 id="v8-bailout-reasons-more-v8-resources">V8 bailout reasons &amp;&amp; more V8 resources</h2>
+<!--<![endif]--><head><meta charset="utf-8"><title>June 15, 2016</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="stylesheet" href="/diary/styles/global.css"><link rel="stylesheet" href="/diary/styles/tomorrow.css"><link rel="stylesheet" href="/diary/styles/diary.css"><script>(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+})(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+ga('create', 'UA-63818301-1', 'auto');
+ga('send', 'pageview');</script></head><body><header class="header"><div class="index"><a href="/diary/">Index</a></div><h1>June 15, 2016</h1></header><div class="content"><div class="diary"><h2 id="v8-bailout-reasons-more-v8-resources">V8 bailout reasons &amp;&amp; more V8 resources</h2>
 <h3 id="how-to-detect-bailouts-in-your-code">How to detect bailouts in your code</h3>
 <pre><code>// <span class="hljs-operator"><span class="hljs-keyword">Install</span> V8
 brew <span class="hljs-keyword">install</span> V8 
@@ -15,7 +21,7 @@ d8 <span class="hljs-comment">--trace-opt --allow-natives-syntax demo.js</span>
  reason: Unsupported phi <span class="hljs-keyword">use</span> <span class="hljs-keyword">of</span> arguments]</span>
 </code></pre><p>You can find some examples, explanations and advices on V8 bailout with <a href="https://github.com/vhf/v8-bailout-reasons">V8 bailout reasons</a>.</p>
 <p>And this <a href="https://github.com/petkaantonov/bluebird/wiki/Optimization-killers">Optimization killers</a> doc is helpful too.</p>
-<h3 id="-irhydra2-http-mrale-ph-irhydra-2-"><a href="http://mrale.ph/irhydra/2/">IRHydra2</a></h3>
+<h3 id="irhydra2"><a href="http://mrale.ph/irhydra/2/">IRHydra2</a></h3>
 <p>A tool that helps you to visualize the output of V8 when bailout happens.</p>
 <pre><code><span class="hljs-comment">d8</span> <span class="hljs-literal">-</span><span class="hljs-literal">-</span><span class="hljs-comment">trace</span><span class="hljs-literal">-</span><span class="hljs-comment">hydrogen</span> <span class="hljs-literal">-</span><span class="hljs-literal">-</span><span class="hljs-comment">trace</span><span class="hljs-literal">-</span><span class="hljs-comment">phase=Z</span> <span class="hljs-literal">-</span><span class="hljs-literal">-</span><span class="hljs-comment">trace</span><span class="hljs-literal">-</span><span class="hljs-comment">deopt</span> <span class="hljs-literal">-</span><span class="hljs-literal">-</span><span class="hljs-comment">code</span><span class="hljs-literal">-</span><span class="hljs-comment">comments</span>  <span class="hljs-literal">-</span><span class="hljs-literal">-</span><span class="hljs-comment">hydrogen</span><span class="hljs-literal">-</span><span class="hljs-comment">track</span><span class="hljs-literal">-</span><span class="hljs-comment">positions</span>  <span class="hljs-literal">-</span><span class="hljs-literal">-</span><span class="hljs-comment">redirect</span><span class="hljs-literal">-</span><span class="hljs-comment">code</span><span class="hljs-literal">-</span><span class="hljs-comment">traces</span> <span class="hljs-literal">-</span><span class="hljs-literal">-</span><span class="hljs-comment">redirect</span><span class="hljs-literal">-</span><span class="hljs-comment">code</span><span class="hljs-literal">-</span><span class="hljs-comment">traces</span><span class="hljs-literal">-</span><span class="hljs-comment">to=code</span><span class="hljs-string">.</span><span class="hljs-comment">asm</span> <span class="hljs-comment">demo</span><span class="hljs-string">.</span><span class="hljs-comment">js</span>
 </code></pre><p>And open code.asm and hydrogen.cfg in IRHydra2.</p>
@@ -30,4 +36,4 @@ d8 <span class="hljs-comment">--trace-opt --allow-natives-syntax demo.js</span>
 <li><a href="http://www.html5rocks.com/en/tutorials/speed/v8/">http://www.html5rocks.com/en/tutorials/speed/v8/</a></li>
 <li><a href="https://www.youtube.com/watch?v=YPkPYqoinU8">Expert to Expert - Erik Meijer and Lars Bak: Inside V8 - A Javascript Virtual Machine</a></li>
 </ul>
-</div></div><footer class="footer"><address class="author">Copyright &copy;<a rel="author" href="https://github.com/zindex" class="author-name">Zindex</a>-<a href="https://github.com/zxc0328/diary-content" class="source-repo">Source</a></address><p>Generated by<a href="https://github.com/joyeecheung/diary" class="site-repo">Joyee Cheung&#39;s diary generator</a></p></footer></body></html>
+</div></div><footer class="footer"><address class="author">Copyright &copy;<a rel="author" href="https://github.com/joyeecheung" class="author-name">Joyee Cheung</a>-<a href="https://github.com/zxc0328/diary-content.git" class="source-repo">Source</a></address><p>Generated by<a href="https://github.com/joyeecheung/diary" class="site-repo">Joyee Cheung&#39;s diary generator</a></p></footer></body></html>
