@@ -1,3 +1,6 @@
 [submodule "diary"]
 	path = diary
 	url = git@github.com:joyeecheung/my-tech-diary.git
+[submodule "diary-content"]
+	path = diary-content
+	url = https://github.com/zxc0328/diary-content.git
