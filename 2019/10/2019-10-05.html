@@ -1,0 +1,133 @@
+<!DOCTYPE html><!--[if lte IE 8]>
+<html lang="en" class="lte-ie8">
+<![endif]-->
+<!--[if gt IE 8]><!-->
+<html lang="en">
+<!--<![endif]--><head><meta charset="utf-8"><title>October 5, 2019</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="stylesheet" href="/diary/styles/global.css"><link rel="stylesheet" href="/diary/styles/tomorrow.css"><link rel="stylesheet" href="/diary/styles/diary.css"><script>(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+})(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+ga('create', 'UA-63818301-1', 'auto');
+ga('send', 'pageview');</script></head><body><header class="header"><div class="index"><a href="/diary/">Index</a></div><h1>October 5, 2019</h1></header><div class="content"><div class="diary"><h2 id="ts-">TS 学习总结：编译选项 &amp;&amp; 类型相关技巧</h2>
+<h3 id="-">编译器选项</h3>
+<p>合法的 JS 代码就是合法的 TS 代码，所以我们在使用 TS 的时候，在默认的编译器配置下，受到的约束比较少。为了不让 TypeScript 变成 AnyScript，我们需要了解 TS 的编译器选项，并进行合理的配置。TS 配置中有一个 <code>--strict</code>，开启了这个选项就等于开启了 <code>--noImplicitAny, --noImplicitThis, --alwaysStrict, --strictBindCallApply, --strictNullChecks, --strictFunctionTypes and --strictPropertyInitialization.</code>。下面就来解析一下这些选项的作用：</p>
+<h4 id="-noimplicitany"><code>--noImplicitAny</code></h4>
+<p>TS Deep Dive 中的相关<a href="https://basarat.gitbooks.io/typescript/docs/options/noImplicitAny.html">说明</a>。这个选项不是说不能使用 any，是不能使用隐式的 any。比如一个函数的入参，如果没有进行类型标注，那这个类型就是 any。这是隐式的。这个选项要求你把所有需要标注类型的地方都加上类型。当然你也可以在这些地方都使用 any，那就是另一回事了。可以使用 Linter 来禁止对显示 any 的使用。但有时候 any 也是有用的，比如<a href="https://zhuanlan.zhihu.com/p/62292091">这篇文章</a>里提到的。不管如何，在纯 TS 项目里，noImplicitAny 还是有必要开启的。</p>
+<h4 id="-noimplicitthis"><code>--noImplicitThis</code></h4>
+<p>如果推断出 this 的类型是 any，就会报错。这样就可以避免一些因为 this 指向不正确而造成的问题。具体可以看<a href="https://jkchao.github.io/typescript-book-chinese/typings/thisType.html">这里</a>。</p>
+<h4 id="-strictbindcallapply"><code>--strictBindCallApply</code></h4>
+<p>这个选项会在 bind，call，和 apply 时，根据原函数的类型签名对调用进行类型校验。是在 TS 3.2 版本中加入的。</p>
+<pre><code><span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">foo</span><span class="hljs-params">(a: number, b: string)</span><span class="hljs-type">: string</span> </span>{
+    <span class="hljs-keyword">return</span> a + b;
+}
+
+let a = foo.apply(<span class="hljs-literal">undefined</span>, [<span class="hljs-number">10</span>]);              <span class="hljs-comment">// error: too few argumnts</span>
+let b = foo.apply(<span class="hljs-literal">undefined</span>, [<span class="hljs-number">10</span>, <span class="hljs-number">20</span>]);          <span class="hljs-comment">// error: 2nd argument is a number</span>
+let c = foo.apply(<span class="hljs-literal">undefined</span>, [<span class="hljs-number">10</span>, <span class="hljs-string">"hello"</span>, <span class="hljs-number">30</span>]); <span class="hljs-comment">// error: too many arguments</span>
+let d = foo.apply(<span class="hljs-literal">undefined</span>, [<span class="hljs-number">10</span>, <span class="hljs-string">"hello"</span>]);     <span class="hljs-comment">// okay! returns a string</span>
+</code></pre><blockquote>
+<p>这个检查在泛型函数和有重载的函数有一些限制</p>
+</blockquote>
+<h4 id="-strictnullchecks"><code>--strictNullChecks</code></h4>
+<p>开启了这个选项之后，null，undefined 两个类型会被区分开来。<code>T</code> 和 <code>T | undefined</code> 也会是不同的类型。一个类型必须显式说明有可能为 undefined。这个检查使得一些 undefined 错误可以被检查出来。具体例子参考 <a href="https://basarat.gitbooks.io/typescript/docs/options/strictNullChecks.html">TS Deep Dive 的相关章节</a>。</p>
+<h3 id="-">类型相关技巧</h3>
+<p>下面总结一下 TS 中的类型相关的一些比较高级的内容</p>
+<h4 id="-">高级类型</h4>
+<p>TS 官方手册中的 <a href="https://www.typescriptlang.org/docs/handbook/advanced-types.html">Advanced Types</a> 章节中提到了一些高级类型。通过合理的使用这些高级类型，可以让我们的类型检查和推断更完善和便捷。</p>
+<h5 id="mapped-types">Mapped types</h5>
+<p>Mapped types 指的是把一个类型的属性进行映射产出的新类型。</p>
+<p><strong>Partial<T></strong></p>
+<p>Partial 会把一个类型中所有的属性都变成 Optional，在业务中一些类型在使用的时候，不一定所有属性都有值，这个时候 Partial 很常用。</p>
+<pre><code>const mergeOptions = (options: <span class="hljs-type">Opt</span>, patch: <span class="hljs-type">Partial</span>&lt;<span class="hljs-type">Opt</span>&gt;) {
+  <span class="hljs-keyword">return</span> { ...options, ...patch };
+}
+
+<span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">MyComponent</span> <span class="hljs-keyword"><span class="hljs-keyword">extends</span></span> <span class="hljs-title">React</span>.<span class="hljs-title">PureComponent&lt;Props&gt;</span> {</span>
+  defaultProps: <span class="hljs-type">Partial</span>&lt;<span class="hljs-type">Props</span>&gt; = {};
+}
+</code></pre><p><strong>Record&lt;K,T&gt;</strong></p>
+<p>业务中，我们经常会写枚举和对应的映射，<code>Record</code> 可以保证映射完整:</p>
+<pre><code>type AnimalType = <span class="hljs-string">'cat'</span> | <span class="hljs-string">'dog'</span> | <span class="hljs-string">'frog'</span>;
+<span class="hljs-class"><span class="hljs-keyword">interface</span> <span class="hljs-title">AnimalDescription</span> {</span> <span class="hljs-string">name:</span> string, <span class="hljs-string">icon:</span> string }
+const <span class="hljs-string">AnimalMap:</span> Record&lt;AnimalType, AnimalDescription&gt; = {
+<span class="hljs-label">  cat:</span> { <span class="hljs-string">name:</span> <span class="hljs-string">'猫'</span>, <span class="hljs-string">icon:</span> <span class="hljs-string">'🐱'</span>},
+<span class="hljs-label">  dog:</span> { <span class="hljs-string">name:</span> <span class="hljs-string">'狗'</span>, <span class="hljs-string">icon:</span> <span class="hljs-string">'🐶'</span> },
+<span class="hljs-label">  forg:</span> { <span class="hljs-string">name:</span> <span class="hljs-string">'蛙'</span>, <span class="hljs-string">icon:</span> <span class="hljs-string">'🐸'</span> }, <span class="hljs-comment">// 拼写错误！</span>
+};
+</code></pre><p>需要注意的是，Record 不是 homomorphic 的。</p>
+<pre><code><span class="hljs-keyword">Readonly</span>, <span class="hljs-keyword">Partial</span> <span class="hljs-keyword">and</span> Pick are homomorphic whereas <span class="hljs-keyword">Record</span> <span class="hljs-keyword">is</span> <span class="hljs-keyword">not</span>. One clue that <span class="hljs-keyword">Record</span> <span class="hljs-keyword">is</span> <span class="hljs-keyword">not</span> homomorphic <span class="hljs-keyword">is</span> that it doesn’t <span class="hljs-keyword">take</span> an input <span class="hljs-keyword">type</span> <span class="hljs-keyword">to</span> <span class="hljs-keyword">copy</span> properties <span class="hljs-keyword">from</span>:
+</code></pre><h5 id="conditional-types">Conditional Types</h5>
+<p>强烈推荐阅读 -&gt; <a href="https://artsy.github.io/blog/2018/11/21/conditional-types-in-typescript/">Conditional types in TypeScript - David Sheldrick</a> 写的很通俗易懂，幽默风趣。</p>
+<p>推荐阅读 -&gt; <a href="https://mariusschulz.com/blog/conditional-types-in-typescript">Conditional Types in TypeScript - Marius Schulz</a> 写的很详细，比官方文档总结的更好。</p>
+<p>条件类型的用法是这样的：</p>
+<p><code>T extends U ? X : Y</code></p>
+<p>如果 T 和 U 兼容（T 包含 U 有的所有属性，T 可以被赋值给 U），这个类型就是 X，否则就是 Y。</p>
+<p>看一下条件类型的实际用途：</p>
+<p>比如有如下的函数，可能返回 string，也可能是 null：</p>
+<pre><code>function process(<span class="hljs-type">text</span>: <span class="hljs-type">string</span> | null): <span class="hljs-type">string</span> | null {
+<span class="hljs-command">  return</span> <span class="hljs-type">text</span> &amp;&amp; <span class="hljs-type">text</span>.replace(/f/g, <span class="hljs-string">"p"</span>)
+}
+</code></pre><p>但这样的类型写法是有问题的，因为返回值有可能是 null，没有 toUpperCase 这个方法。</p>
+<pre><code><span class="hljs-comment">//            ⌄ Type Error! :(</span>
+<span class="hljs-function"><span class="hljs-title">process</span><span class="hljs-params">(<span class="hljs-string">"foo"</span>)</span></span>.<span class="hljs-function"><span class="hljs-title">toUpperCase</span><span class="hljs-params">()</span></span>
+</code></pre><p>这个时候我们可以用条件类型来解决：</p>
+<pre><code><span class="hljs-built_in">function</span> process&lt;T extends <span class="hljs-built_in">string</span> | <span class="hljs-literal">null</span>&gt;(
+  text: T
+): T extends <span class="hljs-built_in">string</span> ? <span class="hljs-built_in">string</span> : <span class="hljs-literal">null</span> {
+  ...
+}
+
+</code></pre><p><strong>distributive conditional types</strong></p>
+<blockquote>
+<p>Conditional types in which the checked type is a naked type parameter are called distributive conditional types. Distributive conditional types are automatically distributed over union types during instantiation. For example, an instantiation of T extends U ? X : Y with the type argument A | B | C for T is resolved as (A extends U ? X : Y) | (B extends U ? X : Y) | (C extends U ? X : Y).</p>
+</blockquote>
+<p>如果条件类型 extends 左边的参数是一个泛型类型变量的话，这个变量有是一个联合类型，那条件类型就是分布到联合类型的每一个成员上，返回一个新的联合类型。这有点类似 Map，只不过作用的是类型变量。</p>
+<p>分布式条件类型和 never 类型一起用，可以起到一个筛选的效果。比如我们有一个条件类型叫 NonNullable：</p>
+<pre><code><span class="hljs-class"><span class="hljs-keyword">type</span> <span class="hljs-title">NonNullable</span>&lt;T&gt; </span>= T extends <span class="hljs-keyword">null</span> | undefined ? never : T;
+</code></pre><p>用起来就是这样的：</p>
+<pre><code><span class="hljs-keyword">type</span> T34 = NonNullable&lt;<span class="hljs-built_in">string</span> | <span class="hljs-built_in">number</span> | <span class="hljs-literal">undefined</span>&gt;;  <span class="hljs-comment">// string | number</span>
+<span class="hljs-keyword">type</span> T35 = NonNullable&lt;<span class="hljs-built_in">string</span> | <span class="hljs-built_in">string</span>[] | <span class="hljs-literal">null</span> | <span class="hljs-literal">undefined</span>&gt;;  <span class="hljs-comment">// string | string[]</span>
+</code></pre><p>如果返回的类型中有 never，就会在联合类型中被丢弃，这样就产生了筛选的效果。</p>
+<p><strong>Type inference in conditional types</strong></p>
+<p>在条件类型中我们可以使用 infer 关键词来表示通过类型推导获得的类型。比如我们可以定义一个叫 ReturnType 的条件类型，用来获取函数的返回值类型：</p>
+<pre><code><span class="hljs-keyword">type</span> ReturnType&lt;T&gt; = T <span class="hljs-keyword">extends</span> (...args: <span class="hljs-built_in">any</span>[]) =&gt; infer R ? R : <span class="hljs-built_in">any</span>;
+</code></pre><p>类似的还有 Parameters 类型：</p>
+<pre><code><span class="hljs-class"><span class="hljs-keyword">type</span> <span class="hljs-title">Parameters&lt;T</span> <span class="hljs-keyword"><span class="hljs-keyword">extends</span></span> (</span>...args: any[]) =&gt; any&gt; =
+  <span class="hljs-type">T</span> <span class="hljs-keyword">extends</span> (...args: infer <span class="hljs-type">P</span>) =&gt; any
+    ? <span class="hljs-type">P</span>
+    : never;
+</code></pre><h5 id="index-types">Index types</h5>
+<p><strong>index type query and indexed access</strong></p>
+<pre><code><span class="hljs-keyword">function</span> getProperty&lt;<span class="hljs-literal">T</span>, K extends keyof <span class="hljs-literal">T</span>&gt;(o: <span class="hljs-literal">T</span>, propertyName: K): <span class="hljs-literal">T</span>[K] {
+    <span class="hljs-keyword">return</span> o[propertyName]; // o[propertyName] is of type <span class="hljs-literal">T</span>[K]
+}
+</code></pre><h5 id="utility-types">Utility Types</h5>
+<p>上述的高级类型，在 TS 中已经内置的：</p>
+<ul>
+<li>Partial<T></li>
+<li>Readonly<T></li>
+<li>Record&lt;K,T&gt;</li>
+<li>Pick&lt;T,K&gt;</li>
+<li>Omit&lt;T,K&gt;</li>
+<li>Exclude&lt;T,U&gt;</li>
+<li>Extract&lt;T,U&gt;</li>
+<li>NonNullable<T></li>
+<li>ReturnType<T></li>
+<li>InstanceType<T></li>
+<li>Required<T></li>
+<li>ThisType<T></li>
+<li>Partial<T></li>
+</ul>
+<h4 id="interface-vs-type-alias">Interface VS Type Alias</h4>
+<p>interface 关键词和 type 关键词的区别：</p>
+<p><a href="https://medium.com/@martin_hotell/interface-vs-type-alias-in-typescript-2-7-2a8f1777af4c">Interface vs Type alias in TypeScript 2.7</a></p>
+<p>官网文档中在 <a href="https://www.typescriptlang.org/docs/handbook/advanced-types.html">Advanced Types</a> 中有一章讲 Interface VS Type Alias 的区别，但其中有一些已经过时了，并且还有一些区别没覆盖到。所以上面列出的博客，列出了在 2.7 版本中 interface 关键词和 type 关键词的区别：</p>
+<ul>
+<li>type aliases can act sort of like interfaces, however, there are 3 important differences <strong>( union types, declaration merging)</strong></li>
+<li>use whatever suites you and your team, just be consistent</li>
+<li>always use interface for public API&#39;s definition when authoring a library or 3rd party ambient type definitions</li>
+<li>consider using type for your React Component Props and State</li>
+</ul>
+<p>上面的两点区别，union types 和 declaration merging，可以详细看上面的博文。</p>
+</div></div><footer class="footer"><address class="author">Copyright &copy;<a rel="author" href="https://github.com/zxc0328" class="author-name">ccnuzindex</a>-<a href="https://github.com/zxc0328/diary-content.git" class="source-repo">Source</a></address><p>Generated by<a href="https://github.com/joyeecheung/diary" class="site-repo">Joyee Cheung&#39;s diary generator</a></p></footer></body></html>
