@@ -36,7 +36,7 @@
     "gulp-util": "^3.0.7",
     "highlight.js": "^8.8.0",
     "jade": "^1.11.0",
-    "lodash": "^3.10.1",
+    "lodash": "^4.17.19",
     "merge-stream": "^0.1.7",
     "node-dir": "^0.1.10",
     "st": "^1.0.0",
