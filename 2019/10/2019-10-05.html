@@ -99,6 +99,12 @@ const <span class="hljs-string">AnimalMap:</span> Record&lt;AnimalType, AnimalDe
     : never;
 </code></pre><h5 id="index-types">Index types</h5>
 <p><strong>index type query and indexed access</strong></p>
+<p><code>keyof T</code> 是 index type query，可以动态的返回类型的 key 组成的 union 类型。</p>
+<blockquote>
+<p>The second operator is T[K], the indexed access operator. Here, the type syntax reflects the expression syntax. That means that person[&#39;name&#39;] has the type Person[&#39;name&#39;]</p>
+</blockquote>
+<p>indexed access operator 则是可以通过 indexed access 来得到类型 T 中某一个 key K 的 value 的类型。</p>
+<p>综合运用例子，一个 getProperty 函数：</p>
 <pre><code><span class="hljs-keyword">function</span> getProperty&lt;<span class="hljs-literal">T</span>, K extends keyof <span class="hljs-literal">T</span>&gt;(o: <span class="hljs-literal">T</span>, propertyName: K): <span class="hljs-literal">T</span>[K] {
     <span class="hljs-keyword">return</span> o[propertyName]; // o[propertyName] is of type <span class="hljs-literal">T</span>[K]
 }
