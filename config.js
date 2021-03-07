@@ -9,6 +9,6 @@ module.exports = {
   },
   base_url: '/diary',  // remote directory for the website
   ga_id: 'UA-63818301-1',  // Optional: Universal Google Analytics ID
-  title: 'Zindex's Tech Diary',
+  title: "Zindex's Tech Diary",
   lang: 'en'
 }
