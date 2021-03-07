@@ -1,0 +1,66 @@
+<!DOCTYPE html><!--[if lte IE 8]>
+<html lang="en" class="lte-ie8">
+<![endif]-->
+<!--[if gt IE 8]><!-->
+<html lang="en">
+<!--<![endif]--><head><meta charset="utf-8"><title>September 13, 2020</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="stylesheet" href="/diary/styles/global.css"><link rel="stylesheet" href="/diary/styles/tomorrow.css"><link rel="stylesheet" href="/diary/styles/diary.css"><script>(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+})(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+ga('create', 'UA-63818301-1', 'auto');
+ga('send', 'pageview');</script></head><body><header class="header"><div class="index"><a href="/diary/">Index</a></div><h1>September 13, 2020</h1></header><div class="content"><div class="diary"><h2 id="es6-">ES6 知识点拾遗</h2>
+<p>最近在系统复习一下知识，发现如果我被问到 ES6 有哪些特性之类的问题，其实大概和两年前没什么区别。这两年真的没有学什么。</p>
+<p>所以打算梳理一下，做一个拾遗。</p>
+<p>其实 ES6 现在已经是一个过气的词了。很多我们在用的特性都是 2015 年之后的 ES 规范里面的。所以只能说是 ES5 之后的新特性。ES5 之前，ES 规范的发展是相对停滞的，在 2015 年之后，新特性才开始有规律的落地到规范中，所以了解 ES6 以及之后几年的 ES 规范，其实基本就等于一个问题：你了解哪些 JS 的新特性？</p>
+<p>以下内容主要是 <a href="https://exploringjs.com/impatient-js">JavaScript for impatient programmers</a> 这本书里相关内容的总结。</p>
+<h3 id="map">Map</h3>
+<p>Map 和 Object 的区别是最可能被问到的。在 ES5 时代，我们通常会用 Object 作为 Map 使用。ES6 中带来了专门用于键值对或者 Hash 的数据结构 Map。</p>
+<p>Map 和 Object 的最大区别就是，Map 可以使用任意类型的值作为 key，而 Object 只能使用 string。看起来 Object 也能使用引用类型作为 key，但仔细看之后会发现，key 值会被隐式转换为调用 toString 方法之后的值。比如 <code>[object Object]</code> 这样的值。</p>
+<p>除此之外，Map 还实现了迭代器接口。Map 的 keys 和 values 返回的都是迭代器对象。使用 <code>...</code> 操作符可以把迭代器对象转为数组。</p>
+<p>Map 不存在字面量，但可以通过传入键值对二维数组形式的字面量给 Map 构造函数来创建 Map。如下：</p>
+<pre><code class="lang-javascript"><span class="hljs-keyword">const</span> map = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Map</span>([
+  [<span class="hljs-number">1</span>, <span class="hljs-string">'one'</span>],
+  [<span class="hljs-number">2</span>, <span class="hljs-string">'two'</span>],
+  [<span class="hljs-number">3</span>, <span class="hljs-string">'three'</span>],
+]);
+</code></pre>
+<p>Object 和 Map 之间是可以很方便的互转的。fromEntries 把 map 转为对象，entries 把对象转为键值对的二维数组，方便传给 Map 构造函数。</p>
+<p>最后，Map 中的 key 和 value 的迭代顺序是有序的。按照被插入的顺序排序。</p>
+<h3 id="iterable-">Iterable 接口</h3>
+<p>迭代器是 ES6 里面引入的一个重要的概念。涉及 Generator 函数这样的相关技术，也被其他基础数据结构所使用，比如上文中说到的 Map。</p>
+<p>迭代，是一种协议和一系列预定义的使用规则。数据源实现这个协议。数据消费者使用这个协议所规定的方法去读取数据。</p>
+<p>在 JS 中，实现（Implement）其实就是指一个对象有一些规定名称和签名的方法。描述应该有哪些方法的就叫做协议（Protocol）或者接口（Interface）。这个概念在 JS 语言里面没有显示的暴露出来，因为 JS 是弱类型语言，对象的类型通常是鸭子类型。TypeScript 里也继承了 JS 中对接口的处理方式（结构化类型），因为 TypeScript 继承了JS 的动态本质。</p>
+<p>JS 中的 Iterable 接口图示：</p>
+<p><img src="https://exploringjs.com/impatient-js/img-book/28b806aaf76a8d70489bd6d28e35f3e37a803ac2.svg" alt="Interable interface"></p>
+<p>右边的数据类型实现了这个接口，左边的是依据这个接口访问数据的一些方法。</p>
+<p>这个接口，如果用 TS 的类型定义描述就是：</p>
+<pre><code class="lang-ts"><span class="hljs-interface"><span class="hljs-keyword">interface</span> Iterable&lt;T&gt; </span>{
+  [Symbol.iterator]() : Iterator&lt;T&gt;;
+}
+
+<span class="hljs-interface"><span class="hljs-keyword">interface</span> Iterator&lt;T&gt; </span>{
+  next() : IteratorResult&lt;T&gt;;
+}
+
+<span class="hljs-interface"><span class="hljs-keyword">interface</span> IteratorResult&lt;T&gt; </span>{
+  value: T;
+  done: <span class="hljs-built_in">boolean</span>;
+}
+</code></pre>
+<p>图示：</p>
+<p><img src="https://exploringjs.com/impatient-js/img-book/c51dfce10b0efd9823cd4ea38a813afdc854d274.svg" alt="interble-iterator"></p>
+<h3 id="bigint">Bigint</h3>
+<p>Bigint 是 JS 中的新基本类型。主要是为了解决之前 JS 中的 Number 的精度有限的问题。</p>
+<p>之前 JS 中的 Number 使用的是 IEEE754 标准的 64 位浮点数。因此精度有限，我们可以通过 <code>Number.MAX_SAFE_INTEGER</code> 和 <code>Number.MIN_SAFE_INTEGER</code> 取到 Number 类型的最大值和最小值。</p>
+<p>Bigint 实现了任意精度的整数。适用于科学计算，金融等等对数据精度要求很高的场景。</p>
+<p>Bigint 的字面量很简单，就是在普通的 Number 后面加上一个 n 就可以。</p>
+<p>值得注意的是，bigint 和 int 是不同的数据类型，并且 Number 的浮点部分不能转换为 bigint，而 bigint 超过 Number 精度的也无法被 Number 所表示。所以在计算表达式中混用两个类型的数据时，会抛出错误。必须做显式类型转换才可以。</p>
+<pre><code class="lang-js"><span class="hljs-number">10</span> + <span class="hljs-number">10</span>n;    <span class="hljs-comment">// → TypeError</span>
+<span class="hljs-built_in">Math</span>.max(<span class="hljs-number">2</span>n, <span class="hljs-number">4</span>n, <span class="hljs-number">6</span>n);    <span class="hljs-comment">// → TypeError</span>
+</code></pre>
+<p>有些操作符比如对比大小，==（非严格等于）时，会发生隐式类型转换。</p>
+<p>最后两个拓展点：</p>
+<p><a href="https://v8.dev/blog/bigint">Bigint 在 V8 中的实现</a>。</p>
+<p><a href="https://golb.hplar.ch/2019/01/js-bigint-json.html">JSON 不支持 bigint 的解决方案</a>。</p>
+</div></div><footer class="footer"><address class="author">Copyright &copy;<a rel="author" href="https://github.com/zxc0328" class="author-name">ccnuzindex</a>-<a href="https://github.com/zxc0328/diary-content.git" class="source-repo">Source</a></address><p>Generated by<a href="https://github.com/joyeecheung/diary" class="site-repo">Joyee Cheung&#39;s diary generator</a></p></footer></body></html>

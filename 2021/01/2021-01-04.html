@@ -1,0 +1,117 @@
+<!DOCTYPE html><!--[if lte IE 8]>
+<html lang="en" class="lte-ie8">
+<![endif]-->
+<!--[if gt IE 8]><!-->
+<html lang="en">
+<!--<![endif]--><head><meta charset="utf-8"><title>January 4, 2021</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="stylesheet" href="/diary/styles/global.css"><link rel="stylesheet" href="/diary/styles/tomorrow.css"><link rel="stylesheet" href="/diary/styles/diary.css"><script>(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+})(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+ga('create', 'UA-63818301-1', 'auto');
+ga('send', 'pageview');</script></head><body><header class="header"><div class="index"><a href="/diary/">Index</a></div><h1>January 4, 2021</h1></header><div class="content"><div class="diary"><h2 id="go-plan-9-">Go Plan 9 汇编</h2>
+<p>在掘金上看到一篇文章：<a href="https://www.purewhite.io/2020/10/14/manual-intelligence-optimize-golang-compiler/">使用人工智能优化 Golang 编译器
+</a> 中通过分析 Go 的汇编代码，来做性能优化。同时想起之前翻过的 《Go 语言高级编程》里面有讲 Go 汇编。其实之前对 Go 汇编的概念，没有太准确的理解。所以做了相关的学习，记录如下。</p>
+<h3 id="-plan9-">为什么是 Plan9 汇编？</h3>
+<p>Go 使用的是 Plan9 操作系统的汇编器。因为开发 Go 语言的作者们，之前也是 Plan9 项目的主导者，所以也沿用了之前 Plan9 的一些基础设施。</p>
+<p>对于 Go 为什么使用 Plan9 汇编，以及使用 Plan9 汇编的得失，可以看<a href="https://zhuanlan.zhihu.com/p/29892487">这里</a>的一些讨论</p>
+<p>有几点事实是需要理清的：</p>
+<ul>
+<li>Plan9 汇编的语法和 X86 汇编有一些不同，并且资料很少。</li>
+<li>Plan9 汇编没有做到平台无关。不同平台还是需要写不同的汇编代码。</li>
+</ul>
+<p>尽管如此，我们还是需要去学习 Plan9 汇编（下用 Go 汇编 指代）。因为只有分析机器级别的代码，才能真正理解自己写的 Go 代码是如何运行的。</p>
+<h3 id="-hello-world-">从 Hello World 说起</h3>
+<p><a href="https://juejin.cn/post/6844903929713524744">这篇文章</a> 从分析 Go 的 Hello World 程序的汇编表示开始，来学习 Go 汇编。不得不说这是一个很好的学习切入点。</p>
+<h3 id="-">寄存器</h3>
+<p>通用寄存器，和 X64 寄存器的对应关系，主要差别就是前面不用加 r。</p>
+<pre><code>IA64    <span class="hljs-literal">RAX</span>    <span class="hljs-literal">RBX</span>    <span class="hljs-literal">RCX</span>    <span class="hljs-literal">RDX</span>    <span class="hljs-literal">RDI</span>    <span class="hljs-literal">RSI</span>    <span class="hljs-literal">RBP</span>    <span class="hljs-literal">RSP</span>    <span class="hljs-literal">R8</span>    <span class="hljs-literal">R9</span>    <span class="hljs-literal">R10</span>    <span class="hljs-literal">R11</span>    <span class="hljs-literal">R12</span>    <span class="hljs-literal">R13</span>    <span class="hljs-literal">R14</span>    <span class="hljs-literal">RIP</span>
+Plan9    <span class="hljs-literal">AX</span>    <span class="hljs-literal">BX</span>    <span class="hljs-literal">CX</span>    <span class="hljs-literal">DX</span>    <span class="hljs-literal">DI</span>    <span class="hljs-literal">SI</span>    <span class="hljs-literal">BP</span>    <span class="hljs-literal">SP</span>    <span class="hljs-literal">R8</span>    <span class="hljs-literal">R9</span>    <span class="hljs-literal">R10</span>    <span class="hljs-literal">R11</span>    <span class="hljs-literal">R12</span>    <span class="hljs-literal">R13</span>    <span class="hljs-literal">R14</span>    PC
+</code></pre><h3 id="-">伪寄存器</h3>
+<ul>
+<li>FP: Frame pointer: arguments and locals.</li>
+<li>PC: Program counter: jumps and branches.</li>
+<li>SB: Static base pointer: global symbols.</li>
+<li>SP: Stack pointer: top of stack.</li>
+</ul>
+<p>这是 Go 汇编里最令人迷惑的点了。要结合函数调用和栈结构来讲。</p>
+<p>可以用一张图表示:</p>
+<p><img src="https://chai2010.cn/advanced-go-programming-book/images/ch3-3-arch-amd64-02.ditaa.png" alt=""></p>
+<p>其中要注意的就是伪 SP 寄存器。指向的是当前函数栈帧的底部（不包括参数和返回值部分），主要用于定位局部变量。真SP寄存器对应的是栈的顶部，一般用于定位调用其它函数的参数和返回值。</p>
+<p>区分伪寄存器和真寄存器的时候只需要记住一点：伪寄存器一般需要一个标识符和偏移量为前缀，如果没有标识符前缀则是真寄存器。比如(SP)、+8(SP)没有标识符前缀为真SP寄存器，而a(SP)、b+8(SP)有标识符为前缀表示伪寄存器。</p>
+<h3 id="-">函数调用和栈结构</h3>
+<pre><code>// func <span class="hljs-keyword">add</span>(a, b <span class="hljs-keyword">int</span>) <span class="hljs-keyword">int</span>
+//   =&gt; 该声明定义在同一个 package 下的任意 <span class="hljs-string">.go</span> 文件中
+//   =&gt; 只有函数头，没有实现
+TEXT pkgname·<span class="hljs-keyword">add</span>(SB), <span class="hljs-preprocessor">NOSPLIT</span>, <span class="hljs-number">$0</span>-<span class="hljs-number">8</span>
+    <span class="hljs-keyword">MOVQ</span> a+<span class="hljs-number">0</span>(FP), <span class="hljs-literal">AX</span>
+    <span class="hljs-keyword">MOVQ</span> a+<span class="hljs-number">8</span>(FP), <span class="hljs-literal">BX</span>
+    ADDQ <span class="hljs-literal">AX</span>, <span class="hljs-literal">BX</span>
+    <span class="hljs-keyword">MOVQ</span> <span class="hljs-literal">BX</span>, <span class="hljs-keyword">ret</span>+<span class="hljs-number">16</span>(FP)
+    <span class="hljs-keyword">RET</span>
+</code></pre><p>里面注意到的点：<code>symbol+offset(FP)</code> 的形式可以获取到函数参数。</p>
+<p>然后函数的声明：</p>
+<pre><code>
+                              参数及返回值大小
+                                  | 
+ TEXT pkgname·add(SB),NOSPLIT,<span class="hljs-variable">$32-32</span>
+       |        |               |
+      包名     函数名         栈帧大小(局部变量+可能需要的额外调用函数的参数空间的总大小，但不包括调用其它函数时的 ret address 的大小)
+
+</code></pre><p>里面需要给出栈帧大小，参数和返回值的大小。</p>
+<p>看一个调用栈的例子：</p>
+<pre><code>
+                                       caller                                                                                 
+                                 +------------------+                                                                         
+                                 |<span class="hljs-string">                  </span>|<span class="hljs-string">                                                                         
+       +----------------------&gt;  --------------------                                                                         
+       </span>|<span class="hljs-string">                         </span>|<span class="hljs-string">                  </span>|<span class="hljs-string">                                                                         
+       </span>|<span class="hljs-string">                         </span>|<span class="hljs-string"> caller parent BP </span>|<span class="hljs-string">                                                                         
+       </span>|<span class="hljs-string">           BP(pseudo SP) --------------------                                                                         
+       </span>|<span class="hljs-string">                         </span>|<span class="hljs-string">                  </span>|<span class="hljs-string">                                                                         
+       </span>|<span class="hljs-string">                         </span>|<span class="hljs-string">   Local Var0     </span>|<span class="hljs-string">                                                                         
+       </span>|<span class="hljs-string">                         --------------------                                                                         
+       </span>|<span class="hljs-string">                         </span>|<span class="hljs-string">                  </span>|<span class="hljs-string">                                                                         
+       </span>|<span class="hljs-string">                         </span>|<span class="hljs-string">   .......        </span>|<span class="hljs-string">                                                                         
+       </span>|<span class="hljs-string">                         --------------------                                                                         
+       </span>|<span class="hljs-string">                         </span>|<span class="hljs-string">                  </span>|<span class="hljs-string">                                                                         
+       </span>|<span class="hljs-string">                         </span>|<span class="hljs-string">   Local VarN     </span>|<span class="hljs-string">                                                                         
+                                 --------------------                                                                         
+ caller stack frame              </span>|<span class="hljs-string">                  </span>|<span class="hljs-string">                                                                         
+                                 </span>|<span class="hljs-string">   callee arg2    </span>|<span class="hljs-string">                                                                         
+       </span>|<span class="hljs-string">                         </span>|<span class="hljs-string">------------------</span>|<span class="hljs-string">                                                                         
+       </span>|<span class="hljs-string">                         </span>|<span class="hljs-string">                  </span>|<span class="hljs-string">                                                                         
+       </span>|<span class="hljs-string">                         </span>|<span class="hljs-string">   callee arg1    </span>|<span class="hljs-string">                                                                         
+       </span>|<span class="hljs-string">                         </span>|<span class="hljs-string">------------------</span>|<span class="hljs-string">                                                                         
+       </span>|<span class="hljs-string">                         </span>|<span class="hljs-string">                  </span>|<span class="hljs-string">                                                                         
+       </span>|<span class="hljs-string">                         </span>|<span class="hljs-string">   callee arg0    </span>|<span class="hljs-string">                                                                         
+       </span>|<span class="hljs-string">                         ----------------------------------------------+   FP(virtual register)                       
+       </span>|<span class="hljs-string">                         </span>|<span class="hljs-string">                  </span>|<span class="hljs-string">                          </span>|<span class="hljs-string">                                              
+       </span>|<span class="hljs-string">                         </span>|<span class="hljs-string">   return addr    </span>|<span class="hljs-string">  parent return address   </span>|<span class="hljs-string">                                              
+       +----------------------&gt;  +------------------+---------------------------    &lt;-------------------------------+         
+                                                    </span>|<span class="hljs-string">  caller BP               </span>|<span class="hljs-string">                                    </span>|<span class="hljs-string">         
+                                                    </span>|<span class="hljs-string">  (caller frame pointer)  </span>|<span class="hljs-string">                                    </span>|<span class="hljs-string">         
+                                     BP(pseudo SP)  ----------------------------                                    </span>|<span class="hljs-string">         
+                                                    </span>|<span class="hljs-string">                          </span>|<span class="hljs-string">                                    </span>|<span class="hljs-string">         
+                                                    </span>|<span class="hljs-string">     Local Var0           </span>|<span class="hljs-string">                                    </span>|<span class="hljs-string">         
+                                                    ----------------------------                                    </span>|<span class="hljs-string">         
+                                                    </span>|<span class="hljs-string">                          </span>|<span class="hljs-string">                                              
+                                                    </span>|<span class="hljs-string">     Local Var1           </span>|<span class="hljs-string">                                              
+                                                    ----------------------------                            callee stack frame
+                                                    </span>|<span class="hljs-string">                          </span>|<span class="hljs-string">                                              
+                                                    </span>|<span class="hljs-string">       .....              </span>|<span class="hljs-string">                                              
+                                                    ----------------------------                                    </span>|<span class="hljs-string">         
+                                                    </span>|<span class="hljs-string">                          </span>|<span class="hljs-string">                                    </span>|<span class="hljs-string">         
+                                                    </span>|<span class="hljs-string">     Local VarN           </span>|<span class="hljs-string">                                    </span>|<span class="hljs-string">         
+                                  SP(Real Register) ----------------------------                                    </span>|<span class="hljs-string">         
+                                                    </span>|<span class="hljs-string">                          </span>|<span class="hljs-string">                                    </span>|<span class="hljs-string">         
+                                                    </span>|<span class="hljs-string">                          </span>|<span class="hljs-string">                                    </span>|<span class="hljs-string">         
+                                                    </span>|<span class="hljs-string">                          </span>|<span class="hljs-string">                                    </span>|<span class="hljs-string">         
+                                                    </span>|<span class="hljs-string">                          </span>|<span class="hljs-string">                                    </span>|<span class="hljs-string">         
+                                                    </span>|<span class="hljs-string">                          </span>|<span class="hljs-string">                                    </span>|<span class="hljs-string">         
+                                                    +--------------------------+    &lt;-------------------------------+         
+
+                                                              callee</span>
+</code></pre><h3 id="go-">Go 汇编的作用：了解不同类型变量的存储方式</h3>
+<p>看 《Go 语言高级编程》 <a href="https://chai2010.cn/advanced-go-programming-book/ch3-asm/ch3-03-const-and-var.html">3.3</a> <a href="https://chai2010.cn/advanced-go-programming-book/ch3-asm/ch3-07-hack-asm.html">3.7</a> 和 <a href="https://chai2010.cn/advanced-go-programming-book/ch3-asm/ch3-07-hack-asm.html">3.8</a></p>
+</div></div><footer class="footer"><address class="author">Copyright &copy;<a rel="author" href="https://github.com/zxc0328" class="author-name">ccnuzindex</a>-<a href="https://github.com/zxc0328/diary-content.git" class="source-repo">Source</a></address><p>Generated by<a href="https://github.com/joyeecheung/diary" class="site-repo">Joyee Cheung&#39;s diary generator</a></p></footer></body></html>

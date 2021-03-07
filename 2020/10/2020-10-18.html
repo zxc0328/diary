@@ -1,0 +1,91 @@
+<!DOCTYPE html><!--[if lte IE 8]>
+<html lang="en" class="lte-ie8">
+<![endif]-->
+<!--[if gt IE 8]><!-->
+<html lang="en">
+<!--<![endif]--><head><meta charset="utf-8"><title>October 18, 2020</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="stylesheet" href="/diary/styles/global.css"><link rel="stylesheet" href="/diary/styles/tomorrow.css"><link rel="stylesheet" href="/diary/styles/diary.css"><script>(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+})(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+ga('create', 'UA-63818301-1', 'auto');
+ga('send', 'pageview');</script></head><body><header class="header"><div class="index"><a href="/diary/">Index</a></div><h1>October 18, 2020</h1></header><div class="content"><div class="diary"><h2 id="kotlin-function-">Kotlin 学习笔记：Function 相关</h2>
+<p>最近打算继续学安卓，目标是有实战的能力。因此打算从看项目代码入手。因为看一些 Demo 项目不如看正经的课表项目，所以就看了 WakeUp 课表的代码。然后发现 Kotlin 的语法还是需要学习一下的，不然很难真正看懂，也很难去写代码。</p>
+<p>打算先把代码里找到的疑惑的点，去找对应的知识点看一下，最后补一些漏洞，这样基本就入门了。</p>
+<h3 id="function">Function</h3>
+<p>Kotlin 里的函数，是一等函数。可以作为参数传递，也可以被返回。</p>
+<p>函数的基本语法是这样的：</p>
+<pre><code><span class="hljs-function"><span class="hljs-keyword">fun</span> <span class="hljs-title">double</span></span>(<span class="hljs-symbol">x:</span> <span class="hljs-constant">Int</span>): <span class="hljs-constant">Int</span> {
+    <span class="hljs-keyword">return</span> <span class="hljs-number">2</span> * x
+}
+</code></pre><p>总的来说和 Swift/TS 之类的很像。</p>
+<h4 id="default-arguments-named-arguments">Default arguments 与 Named arguments</h4>
+<p>Named arguments 在 Swift 里面也有。Default arguments 就不用说了，就是给参数一个默认值。</p>
+<p>这两者会配合使用，比如：</p>
+<pre><code><span class="hljs-function"><span class="hljs-keyword">fun</span> <span class="hljs-title">foo</span><span class="hljs-params">(
+    bar: <span class="hljs-typename">Int</span> = 0, 
+    baz: <span class="hljs-typename">Int,</span>
+)</span> { <span class="hljs-comment">/*...*/</span> }</span>
+
+foo(baz = <span class="hljs-number">1</span>) <span class="hljs-comment">// The default value bar = 0 is used</span>
+</code></pre><p><em>bar 想用默认值，所以不需要传，但它又声明在 baz 前面。有了 Named arguments 就可以直接传 baz 了。</em></p>
+<pre><code>fun reformat(
+    str: String,
+    normalizeCase: <span class="hljs-keyword">Boolean</span> = <span class="hljs-keyword">true</span>,
+    upperCaseFirstLetter: <span class="hljs-keyword">Boolean</span> = <span class="hljs-keyword">true</span>,
+    divideByCamelHumps: <span class="hljs-keyword">Boolean</span> = <span class="hljs-keyword">false</span>,
+    wordSeparator: <span class="hljs-keyword">Char</span> = <span class="hljs-string">' '</span>,
+) {
+<span class="hljs-comment">/*...*/</span>
+}
+
+reformat(<span class="hljs-string">'This is a short String!'</span>, upperCaseFirstLetter = <span class="hljs-keyword">false</span>, wordSeparator = <span class="hljs-string">'_'</span>)
+</code></pre><p><em>需要注意的是，如果普通传法和 Named 传法混用，来使得一些参数用默认值，第一个 Named 参数后面的所有参数都需要用 Named 写法列出来</em></p>
+<h4 id="varargs">Varargs</h4>
+<pre><code>fun &lt;T&gt; asList(vararg ts: T): <span class="hljs-type">List</span>&lt;T&gt; {
+    val <span class="hljs-literal">result</span> = <span class="hljs-type">ArrayList</span>&lt;T&gt;()
+    <span class="hljs-keyword">for</span> (t <span class="hljs-keyword">in</span> ts) // ts <span class="hljs-keyword">is</span> an <span class="hljs-type">Array</span>
+        <span class="hljs-literal">result</span>.add(t)
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">result</span>
+}
+</code></pre><p><code>vararg</code> 表示可变长度的参数。类似 JS 里面的 <code>...args</code>。但 vararg 可以不放在最后一位。如果不在最后一位，vararg 后面的参数可以用 Named Arguments 传入。</p>
+<h3 id="lambda-expression">Lambda Expression</h3>
+<p>Lambda Expression 是一种用于声明函数表达式的语法。同时，在业务代码中，Lambda 表达式可以对 SAM（单个抽象方法接口）的参数传递做很大程度的语法上的简化。</p>
+<p><strong>Lambda 表达式的语法如下：</strong></p>
+<pre><code><span class="hljs-variable"><span class="hljs-keyword">val</span> sum</span>: (<span class="hljs-typename">Int</span>, <span class="hljs-typename">Int</span>) -&gt; <span class="hljs-typename">Int</span> = { x: <span class="hljs-typename">Int</span>, y: <span class="hljs-typename">Int</span> -&gt; x + y }
+</code></pre><p>将一个箭头函数放到花括号中，就是 Lambda 表达式了。</p>
+<p>Lambda 表达式的语法简化：</p>
+<ul>
+<li>变量的类型可以不写，因为返回值类型可以推导出来</li>
+<li>trailing lambdas：<code>items.fold(1) { acc, e -&gt; acc * e }</code> 如果函数最后一个参数是函数，最后一个函数参数可以写到小括号后面</li>
+<li>如果函数参数是唯一一个参数，那小括号可以省略：<code>run { println(&quot;...&quot;) }</code></li>
+<li>Lambda 如果只有一个参数，这个参数可以用 it 指代，并省略参数声明和 -&gt; ： <code>ints.filter { it &gt; 0 } // this literal is of type &#39;(it: Int) -&gt; Boolean&#39;</code></li>
+<li>如果没有写 return，最后一个表达式会作为 return 值返回</li>
+</ul>
+<p><strong>Lambda 在 Android 开发中的用途：</strong></p>
+<p>比如事件监听，可以这么写，一个匿名类对象：</p>
+<pre><code>button.setOnClickListener(<span class="hljs-keyword">object</span> : View.OnClickListener{
+    <span class="hljs-keyword">override</span> <span class="hljs-function"><span class="hljs-keyword">fun</span> <span class="hljs-title">onClick</span><span class="hljs-params">(v: <span class="hljs-typename">View?</span>)</span> {</span>
+    }
+})
+</code></pre><p>使用 Lambda 可以写成这样：</p>
+<pre><code><span class="hljs-tag">button</span><span class="hljs-class">.setOnClickListener</span> <span class="hljs-rules">{ }</span>
+</code></pre><p>编译时 Lambda 会自动转换为 SAM，前提是 SAM 的方法的签名要和 Lambda 一样。</p>
+<h3 id="-">匿名函数</h3>
+<p>语法：</p>
+<pre><code><span class="hljs-function"><span class="hljs-keyword">fun</span>(<span class="hljs-title">x</span></span>: <span class="hljs-constant">Int</span>, <span class="hljs-symbol">y:</span> <span class="hljs-constant">Int</span>): <span class="hljs-constant">Int</span> = x + y
+</code></pre><p>Lambda 表达式的问题在于，无法显示声明返回值的类型。</p>
+<p>其他匿名函数和 Lambda 表达式的不同之处在于：</p>
+<ul>
+<li>匿名函数，单行写法可以不写返回值类型，但加了花括号就需要显示指定返回值类型</li>
+<li>匿名函数无法使用类型 trailing lambdas 形式的语法</li>
+<li>另一个在于 return。Lambda 表达式的 return 默认会让父函数 return，如果只是需要从 Lambda 表达式中 return，需要使用 labeled return</li>
+</ul>
+<h3 id="links">Links</h3>
+<ul>
+<li><a href="https://juejin.im/post/6844904036617961486">[Kotlin Tutorials 6] Lambda表达式和高阶函数</a></li>
+<li><a href="https://kotlinlang.org/docs/reference/functions.html">Kotlin Docs: Function</a></li>
+<li><a href="https://kotlinlang.org/docs/reference/lambdas.html">Kotlin Docs: Lambda</a></li>
+<li><a href="https://medium.com/tompee/idiomatic-kotlin-lambdas-and-sam-constructors-fe2075965bfb">Idiomatic Kotlin: Lambdas and SAM constructors</a> 这个系列不错</li>
+</ul>
+</div></div><footer class="footer"><address class="author">Copyright &copy;<a rel="author" href="https://github.com/zxc0328" class="author-name">ccnuzindex</a>-<a href="https://github.com/zxc0328/diary-content.git" class="source-repo">Source</a></address><p>Generated by<a href="https://github.com/joyeecheung/diary" class="site-repo">Joyee Cheung&#39;s diary generator</a></p></footer></body></html>

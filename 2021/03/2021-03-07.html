@@ -1,0 +1,541 @@
+<!DOCTYPE html><!--[if lte IE 8]>
+<html lang="en" class="lte-ie8">
+<![endif]-->
+<!--[if gt IE 8]><!-->
+<html lang="en">
+<!--<![endif]--><head><meta charset="utf-8"><title>March 7, 2021</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="stylesheet" href="/diary/styles/global.css"><link rel="stylesheet" href="/diary/styles/tomorrow.css"><link rel="stylesheet" href="/diary/styles/diary.css"><script>(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+})(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+ga('create', 'UA-63818301-1', 'auto');
+ga('send', 'pageview');</script></head><body><header class="header"><div class="index"><a href="/diary/">Index</a></div><h1>March 7, 2021</h1></header><div class="content"><div class="diary"><h2 id="konva-">Konva 源码阅读笔记</h2>
+<p>Konva 是对 HTML Canvas API 的封装，在 Canvas API 基础上封装了 各类 Shape，Event，缓存，拖拽，动画，Transform 等等基础图形 API。整体的 API 风格是这样的：</p>
+<pre><code class="lang-javascript"><span class="hljs-comment">// first we need to create a stage</span>
+<span class="hljs-keyword">var</span> stage = <span class="hljs-keyword">new</span> Konva.Stage({
+  container: <span class="hljs-string">"container"</span>, <span class="hljs-comment">// id of container &lt;div&gt;</span>
+  width: <span class="hljs-number">500</span>,
+  height: <span class="hljs-number">500</span>,
+});
+
+<span class="hljs-comment">// then create layer</span>
+<span class="hljs-keyword">var</span> layer = <span class="hljs-keyword">new</span> Konva.Layer();
+
+<span class="hljs-comment">// create our shape</span>
+<span class="hljs-keyword">var</span> circle = <span class="hljs-keyword">new</span> Konva.Circle({
+  x: stage.width() / <span class="hljs-number">2</span>,
+  y: stage.height() / <span class="hljs-number">2</span>,
+  radius: <span class="hljs-number">70</span>,
+  fill: <span class="hljs-string">"red"</span>,
+  stroke: <span class="hljs-string">"black"</span>,
+  strokeWidth: <span class="hljs-number">4</span>,
+});
+
+<span class="hljs-comment">// add the shape to the layer</span>
+layer.add(circle);
+
+<span class="hljs-comment">// add the layer to the stage</span>
+stage.add(layer);
+
+<span class="hljs-comment">// draw the image</span>
+layer.draw();
+</code></pre>
+<h3 id="-">主要类</h3>
+<p>Konva 是用 TS 写的。代码以经典的 OOP 风格组织。下面是 Konva 中几个重要的类：</p>
+<h4 id="stage">Stage</h4>
+<p>Stage 是一组 Layer 的容器。一个 Layer 就代表一个图层，对应一个 canvas 元素。</p>
+<p>Stage 继承自 Container，Container 继承自 Node。</p>
+<h4 id="layer">Layer</h4>
+<p>Layer 代表一个图层。是一组 group 或者 shape 的容器。</p>
+<p>Layer 继承自 Container，Container 继承自 Node。</p>
+<h4 id="shape">Shape</h4>
+<p>Shape 是具体形状的绘图节点，比如 Rect，Circle，Text 等等。是 Konva 里面最 primitive 的元素。</p>
+<p>Shape 继承自 Node。</p>
+<h4 id="node">Node</h4>
+<p>Node 是 Konva 里主要对象的基类。</p>
+<h4 id="-">层级关系</h4>
+<pre><code>Stage
+├── Layer
+|   ├── <span class="hljs-keyword">Group</span>
+<span class="hljs-title">|       └── Shape</span>
+|   └── <span class="hljs-keyword">Group</span>
+<span class="hljs-title">|       ├── Shape</span>
+|       └── <span class="hljs-keyword">Group</span>
+<span class="hljs-title">|           └── Shape</span>
+└── Layer
+    └── Shape
+</code></pre><h3 id="-">主流程</h3>
+<h3 id="layer-draw">layer.draw</h3>
+<p>从上面的 Konva Hello World 例子中我们可以看到，Konva 的渲染是同过 <code>layer.draw()</code> 这个调用触发的。</p>
+<p>我们可以通过 <code>layer.draw()</code> 的调用流程，来看看 Konva 的渲染链路。</p>
+<p>Layer 类的 draw 方法，是由祖父类 Node 提供的：</p>
+<pre><code class="lang-typescript">draw() {
+    <span class="hljs-keyword">this</span>.drawScene();
+    <span class="hljs-keyword">this</span>.drawHit();
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
+}
+
+<span class="hljs-keyword">abstract</span> drawScene(canvas?: Canvas, top?: Node): <span class="hljs-built_in">void</span>;
+<span class="hljs-keyword">abstract</span> drawHit(canvas?: Canvas, top?: Node): <span class="hljs-built_in">void</span>;
+</code></pre>
+<p>drawScene 和 drawHit 是 abstract 方法，是由子类自行实现的。</p>
+<p>drawScene 是用于绘制的，drawHit 是用于绘制 Hit test 区域的。Hit Test 这块后面会讲到。</p>
+<p>我们先来看 drawScene，drawScene 是由 Layer 类实现的：</p>
+<pre><code class="lang-typescript">drawScene(can, top) {
+    <span class="hljs-keyword">var</span> layer = <span class="hljs-keyword">this</span>.getLayer(),
+      canvas = can || (layer &amp;&amp; layer.getCanvas());
+
+    <span class="hljs-keyword">this</span>._fire(BEFORE_DRAW, {
+      node: <span class="hljs-keyword">this</span>,
+    });
+
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.clearBeforeDraw()) {
+      canvas.getContext().clear();
+    }
+
+    Container.prototype.drawScene.call(<span class="hljs-keyword">this</span>, canvas, top);
+
+    <span class="hljs-keyword">this</span>._fire(DRAW, {
+      node: <span class="hljs-keyword">this</span>,
+    });
+
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
+}
+</code></pre>
+<p>这里主要就是调用了 <code>Container.prototype.drawScene</code>：</p>
+<pre><code class="lang-typescript">drawScene(can?: SceneCanvas, top?: Node) {
+    <span class="hljs-keyword">var</span> layer = <span class="hljs-keyword">this</span>.getLayer(),
+      canvas = can || (layer &amp;&amp; layer.getCanvas()),
+      context = canvas &amp;&amp; canvas.getContext(),
+      cachedCanvas = <span class="hljs-keyword">this</span>._getCanvasCache(),
+      cachedSceneCanvas = cachedCanvas &amp;&amp; cachedCanvas.scene;
+
+    <span class="hljs-keyword">var</span> caching = canvas &amp;&amp; canvas.isCache;
+    <span class="hljs-keyword">if</span> (!<span class="hljs-keyword">this</span>.isVisible() &amp;&amp; !caching) {
+      <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
+    }
+
+    <span class="hljs-keyword">if</span> (cachedSceneCanvas) {
+      context.save();
+      <span class="hljs-keyword">var</span> m = <span class="hljs-keyword">this</span>.getAbsoluteTransform(top).getMatrix();
+      context.transform(m[<span class="hljs-number">0</span>], m[<span class="hljs-number">1</span>], m[<span class="hljs-number">2</span>], m[<span class="hljs-number">3</span>], m[<span class="hljs-number">4</span>], m[<span class="hljs-number">5</span>]);
+      <span class="hljs-keyword">this</span>._drawCachedSceneCanvas(context);
+      context.restore();
+    } <span class="hljs-keyword">else</span> {
+      <span class="hljs-keyword">this</span>._drawChildren(<span class="hljs-string">'drawScene'</span>, canvas, top);
+    }
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
+}
+</code></pre>
+<p>这里的逻辑是，如果 SceneCanvas 被缓存了，就调用 <code>_drawCachedSceneCanvas</code> 绘制。缓存这块我们先不看。如果不走缓存，则会走 <code>_drawChildren</code> 方法：</p>
+<pre><code class="lang-typescript">_drawChildren(drawMethod, canvas, top) {
+    <span class="hljs-keyword">var</span> context = canvas &amp;&amp; canvas.getContext(),
+      clipWidth = <span class="hljs-keyword">this</span>.clipWidth(),
+      clipHeight = <span class="hljs-keyword">this</span>.clipHeight(),
+      clipFunc = <span class="hljs-keyword">this</span>.clipFunc(),
+      hasClip = (clipWidth &amp;&amp; clipHeight) || clipFunc;
+
+    <span class="hljs-keyword">const</span> selfCache = top === <span class="hljs-keyword">this</span>;
+
+    <span class="hljs-keyword">if</span> (hasClip) {
+      context.save();
+      <span class="hljs-keyword">var</span> transform = <span class="hljs-keyword">this</span>.getAbsoluteTransform(top);
+      <span class="hljs-keyword">var</span> m = transform.getMatrix();
+      context.transform(m[<span class="hljs-number">0</span>], m[<span class="hljs-number">1</span>], m[<span class="hljs-number">2</span>], m[<span class="hljs-number">3</span>], m[<span class="hljs-number">4</span>], m[<span class="hljs-number">5</span>]);
+      context.beginPath();
+      <span class="hljs-keyword">if</span> (clipFunc) {
+        clipFunc.call(<span class="hljs-keyword">this</span>, context, <span class="hljs-keyword">this</span>);
+      } <span class="hljs-keyword">else</span> {
+        <span class="hljs-keyword">var</span> clipX = <span class="hljs-keyword">this</span>.clipX();
+        <span class="hljs-keyword">var</span> clipY = <span class="hljs-keyword">this</span>.clipY();
+        context.rect(clipX, clipY, clipWidth, clipHeight);
+      }
+      context.clip();
+      m = transform.copy().invert().getMatrix();
+      context.transform(m[<span class="hljs-number">0</span>], m[<span class="hljs-number">1</span>], m[<span class="hljs-number">2</span>], m[<span class="hljs-number">3</span>], m[<span class="hljs-number">4</span>], m[<span class="hljs-number">5</span>]);
+    }
+
+    <span class="hljs-keyword">var</span> hasComposition =
+      !selfCache &amp;&amp;
+      <span class="hljs-keyword">this</span>.globalCompositeOperation() !== <span class="hljs-string">'source-over'</span> &amp;&amp;
+      drawMethod === <span class="hljs-string">'drawScene'</span>;
+
+    <span class="hljs-keyword">if</span> (hasComposition) {
+      context.save();
+      context._applyGlobalCompositeOperation(<span class="hljs-keyword">this</span>);
+    }
+
+    <span class="hljs-keyword">this</span>.children.each(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">child</span>) </span>{
+      child[drawMethod](canvas, top);
+    });
+    <span class="hljs-keyword">if</span> (hasComposition) {
+      context.restore();
+    }
+
+    <span class="hljs-keyword">if</span> (hasClip) {
+      context.restore();
+    }
+  }
+</code></pre>
+<p>这个函数里也处理了很多特殊情况，比如 hasClip。核心逻辑就是遍历了 <code>this.children</code>，然后调用了每个子节点的 <code>drawMethod</code>，<code>drawMethod</code>是从上一个调用传过来的，这里是 <code>&#39;drawScene&#39;</code>，除了 <code>&#39;drawScene&#39;</code> 之外，就是 <code>&#39;drawHit&#39;</code>了。</p>
+<p>Layer 的类型是 <code>class Layer extends Container&lt;Group | Shape&gt;</code>，所以子节点的类型也就是 Group 或者 Shape。以Shape 为例，我们看看 Shape 的 drawScene 方法：</p>
+<pre><code class="lang-typescript">getSceneFunc() {
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.attrs.sceneFunc || <span class="hljs-keyword">this</span>[<span class="hljs-string">'_sceneFunc'</span>];
+}
+
+drawScene(can?: SceneCanvas, top?: Node) {
+    <span class="hljs-comment">// basically there are 3 drawing modes</span>
+    <span class="hljs-comment">// 1 - simple drawing when nothing is cached.</span>
+    <span class="hljs-comment">// 2 - when we are caching current</span>
+    <span class="hljs-comment">// 3 - when node is cached and we need to draw it into layer</span>
+
+    <span class="hljs-keyword">var</span> layer = <span class="hljs-keyword">this</span>.getLayer(),
+      canvas = can || layer.getCanvas(),
+      context = canvas.getContext() as SceneContext,
+      cachedCanvas = <span class="hljs-keyword">this</span>._getCanvasCache(),
+      drawFunc = <span class="hljs-keyword">this</span>.getSceneFunc(),
+      hasShadow = <span class="hljs-keyword">this</span>.hasShadow(),
+      stage,
+      bufferCanvas,
+      bufferContext;
+
+    <span class="hljs-keyword">var</span> caching = canvas.isCache;
+    <span class="hljs-keyword">var</span> skipBuffer = canvas.isCache;
+    <span class="hljs-keyword">var</span> cachingSelf = top === <span class="hljs-keyword">this</span>;
+
+    <span class="hljs-keyword">if</span> (!<span class="hljs-keyword">this</span>.isVisible() &amp;&amp; !caching) {
+      <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
+    }
+    <span class="hljs-comment">// if node is cached we just need to draw from cache</span>
+    <span class="hljs-keyword">if</span> (cachedCanvas) {
+      context.save();
+
+      <span class="hljs-keyword">var</span> m = <span class="hljs-keyword">this</span>.getAbsoluteTransform(top).getMatrix();
+      context.transform(m[<span class="hljs-number">0</span>], m[<span class="hljs-number">1</span>], m[<span class="hljs-number">2</span>], m[<span class="hljs-number">3</span>], m[<span class="hljs-number">4</span>], m[<span class="hljs-number">5</span>]);
+      <span class="hljs-keyword">this</span>._drawCachedSceneCanvas(context);
+      context.restore();
+      <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
+    }
+
+    <span class="hljs-keyword">if</span> (!drawFunc) {
+      <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
+    }
+
+    context.save();
+    <span class="hljs-comment">// if buffer canvas is needed</span>
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>._useBufferCanvas() &amp;&amp; !skipBuffer) {
+      stage = <span class="hljs-keyword">this</span>.getStage();
+      bufferCanvas = stage.bufferCanvas;
+      bufferContext = bufferCanvas.getContext();
+      bufferContext.clear();
+      bufferContext.save();
+      bufferContext._applyLineJoin(<span class="hljs-keyword">this</span>);
+      <span class="hljs-comment">// layer might be undefined if we are using cache before adding to layer</span>
+      <span class="hljs-keyword">var</span> o = <span class="hljs-keyword">this</span>.getAbsoluteTransform(top).getMatrix();
+      bufferContext.transform(o[<span class="hljs-number">0</span>], o[<span class="hljs-number">1</span>], o[<span class="hljs-number">2</span>], o[<span class="hljs-number">3</span>], o[<span class="hljs-number">4</span>], o[<span class="hljs-number">5</span>]);
+
+      drawFunc.call(<span class="hljs-keyword">this</span>, bufferContext, <span class="hljs-keyword">this</span>);
+      bufferContext.restore();
+
+      <span class="hljs-keyword">var</span> ratio = bufferCanvas.pixelRatio;
+
+      <span class="hljs-keyword">if</span> (hasShadow) {
+        context._applyShadow(<span class="hljs-keyword">this</span>);
+      }
+      context._applyOpacity(<span class="hljs-keyword">this</span>);
+      context._applyGlobalCompositeOperation(<span class="hljs-keyword">this</span>);
+      context.drawImage(
+        bufferCanvas._canvas,
+        <span class="hljs-number">0</span>,
+        <span class="hljs-number">0</span>,
+        bufferCanvas.width / ratio,
+        bufferCanvas.height / ratio
+      );
+    } <span class="hljs-keyword">else</span> {
+      context._applyLineJoin(<span class="hljs-keyword">this</span>);
+
+      <span class="hljs-keyword">if</span> (!cachingSelf) {
+        <span class="hljs-keyword">var</span> o = <span class="hljs-keyword">this</span>.getAbsoluteTransform(top).getMatrix();
+        context.transform(o[<span class="hljs-number">0</span>], o[<span class="hljs-number">1</span>], o[<span class="hljs-number">2</span>], o[<span class="hljs-number">3</span>], o[<span class="hljs-number">4</span>], o[<span class="hljs-number">5</span>]);
+        context._applyOpacity(<span class="hljs-keyword">this</span>);
+        context._applyGlobalCompositeOperation(<span class="hljs-keyword">this</span>);
+      }
+
+      <span class="hljs-keyword">if</span> (hasShadow) {
+        context._applyShadow(<span class="hljs-keyword">this</span>);
+      }
+
+      drawFunc.call(<span class="hljs-keyword">this</span>, context, <span class="hljs-keyword">this</span>);
+    }
+    context.restore();
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
+  }
+</code></pre>
+<p>这里的逻辑也很复杂，核心的代码其实只有一行：<code>drawFunc.call(this, context, this);</code>，而 drawFunc 是通过 <code>this.getSceneFunc()</code> 返回的，默认值是 <code>_sceneFunc</code>。</p>
+<p>最后让我们来看看最简单 Shape——Circle 的 <code>_sceneFunc</code> 方法：</p>
+<pre><code class="lang-typescript"><span class="hljs-keyword">export</span> <span class="hljs-keyword">class</span> Circle extends Shape&lt;CircleConfig&gt; {
+  _sceneFunc(context) {
+    context.beginPath();
+    context.arc(<span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-keyword">this</span>.attrs.radius || <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-built_in">Math</span>.PI * <span class="hljs-number">2</span>, <span class="hljs-literal">false</span>);
+    context.closePath();
+    context.fillStrokeShape(<span class="hljs-keyword">this</span>);
+}
+</code></pre>
+<p>这里就是最终每个 Shape 的渲染逻辑了。</p>
+<p>到这里，整个渲染流程就结束了。需要注意的是，除了调用 Layer 的 draw 方法之外，在 <code>Stage.add(layer)</code> 的时候，Konva 也会自动调用 Layer 的 draw 方法，并把 Layer 的 canvas 元素插入 DOM。</p>
+<pre><code class="lang-typescript">  add(layer: Layer) {
+    <span class="hljs-keyword">if</span> (<span class="hljs-built_in">arguments</span>.length &gt; <span class="hljs-number">1</span>) {
+      <span class="hljs-keyword">for</span> (<span class="hljs-keyword">var</span> i = <span class="hljs-number">0</span>; i &lt; <span class="hljs-built_in">arguments</span>.length; i++) {
+        <span class="hljs-keyword">this</span>.add(<span class="hljs-built_in">arguments</span>[i]);
+      }
+      <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
+    }
+    <span class="hljs-keyword">super</span>.add(layer);
+
+    <span class="hljs-keyword">var</span> length = <span class="hljs-keyword">this</span>.children.length;
+    <span class="hljs-keyword">if</span> (length &gt; MAX_LAYERS_NUMBER) {
+      Util.warn(
+        <span class="hljs-string">'The stage has '</span> +
+          length +
+          <span class="hljs-string">' layers. Recommended maximum number of layers is 3-5. Adding more layers into the stage may drop the performance. Rethink your tree structure, you can use Konva.Group.'</span>
+      );
+    }
+    layer.setSize({ width: <span class="hljs-keyword">this</span>.width(), height: <span class="hljs-keyword">this</span>.height() });
+
+    <span class="hljs-comment">// 调用 layer 的 draw 方法</span>
+    layer.draw();
+
+    <span class="hljs-comment">// 把 layer 的 canvas 元素插入 DOM</span>
+    <span class="hljs-keyword">if</span> (Konva.isBrowser) {
+      <span class="hljs-keyword">this</span>.content.appendChild(layer.canvas._canvas);
+    }
+
+    <span class="hljs-comment">// chainable</span>
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
+  }
+</code></pre>
+<p>这里还有一个细节需要注意，在 Shape 的 <code>_sceneFunc</code> 方法中，绘图调用的 x，y 坐标是以 0,0 点为基准的： <code>context.arc(0, 0, this.attrs.radius || 0, 0, Math.PI * 2, false);</code>。这是因为在 Shape 的 drawScene 方法在绘制之前对 context 做了 transform：</p>
+<pre><code class="lang-typescript"><span class="hljs-keyword">var</span> o = <span class="hljs-keyword">this</span>.getAbsoluteTransform(top).getMatrix();
+context.transform(o[<span class="hljs-number">0</span>], o[<span class="hljs-number">1</span>], o[<span class="hljs-number">2</span>], o[<span class="hljs-number">3</span>], o[<span class="hljs-number">4</span>], o[<span class="hljs-number">5</span>]);
+</code></pre>
+<p>这段代码会获取当前 Shape 相对于原点的变换矩阵，然后应用到 context 上。这样虽然 Shape 的 <code>_sceneFunc</code> 中传入的坐标是以 0,0 为原点的，也可以转换为最终 Shape 坐在的位置为原点的坐标。</p>
+<p>这是一个简化 Shape 绘制调用的小细节。</p>
+<h3 id="hit-test">Hit Test</h3>
+<p><a href="https://en.wikipedia.org/wiki/Hit-testing">Hit test</a> 是 GUI 编程中的一种过程，指的是判断当前光标所在位置和哪个图形对象有交集。简单的说，就是判断用户事件发生在哪个节点上。</p>
+<p>在浏览器中，这个过程由浏览器做了，所以我们只需要在节点上绑定事件即可。在 Canvas 中，事件都是注册在 Canvas 元素上，我们只能获取到 Canvas 层面的事件，这些事件在 Canvas 内部应该怎样触发，就需要做 Hit Test 了。</p>
+<p>Hit Test 的方法有很多种。Konva 选择的是类似 3D 渲染中的拾取（Picking）技术。</p>
+<blockquote>
+<p>Interactive Computer Graphics. A Top-Down Approach with WebGL-Pearson (2014) 7.14 小节中介绍了这个技术</p>
+</blockquote>
+<p>这个技术的本质是，除了正常渲染的 Canvas 之外，额外为每个 Layer 创建一个离屏的 Canvas，这个 Canvas 上会通过 drawHit 绘制图形的轮廓，这个轮廓（多边形）的颜色是随机的，整个多边形保持同一种颜色。在渲染时，我们会用一个 map 保存颜色和 Shape 实例之间的映射。</p>
+<p>在点击 Canvas 时，我们可以拿到点击的坐标。通过点击的坐标，我们可以获取 HitCanvas 上对应坐标的像素点颜色。根据这个颜色，就可以从 map 中根据颜色拿到对应的 Shape 实例了。</p>
+<p>在 Konva 的<a href="https://konvajs.org/docs/events/Custom_Hit_Region.html">文档-Custom_Hit_Region</a>中，我们可以通过 Toggle hit canvas 让 Hit Canvas 插入 DOM 中，这可以在 Debug 时使用。</p>
+<p>drawHit 默认是和 drawScene 一样的。但我们也可以自定义 drawHit 函数。比如上面文档中讲到的两个例子。为了让用户更好点击，可以扩大 hit region。</p>
+<p>下面来看看代码：</p>
+<p>Hit Test 相关的流程可以从 Canvas 的事件中切入。因为事件都是注册在根节点上的。想要在把事件分发到对应的 Shape 上，必须走 Hit Test 流程。</p>
+<p>拿点击事件来说：</p>
+<p>点击事件是通过监听根节点的 mouseup 事件达成的。 </p>
+<pre><code class="lang-typescript">_mouseup(evt) {
+    <span class="hljs-comment">// workaround for mobile IE to force touch event when unhandled pointer event elevates into a mouse event</span>
+    <span class="hljs-keyword">if</span> (Konva.UA.ieMobile) {
+      <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._touchend(evt);
+    }
+    <span class="hljs-keyword">this</span>.setPointersPositions(evt);
+    <span class="hljs-keyword">var</span> pointerId = Util._getFirstPointerId(evt);
+    <span class="hljs-keyword">var</span> shape = <span class="hljs-keyword">this</span>.getIntersection(<span class="hljs-keyword">this</span>.getPointerPosition()),
+      clickStartShape = <span class="hljs-keyword">this</span>.clickStartShape,
+      clickEndShape = <span class="hljs-keyword">this</span>.clickEndShape,
+      fireDblClick = <span class="hljs-literal">false</span>;
+
+    <span class="hljs-keyword">if</span> (Konva.inDblClickWindow) {
+      fireDblClick = <span class="hljs-literal">true</span>;
+      clearTimeout(<span class="hljs-keyword">this</span>.dblTimeout);
+      <span class="hljs-comment">// Konva.inDblClickWindow = false;</span>
+    } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (!DD.justDragged) {
+      <span class="hljs-comment">// don't set inDblClickWindow after dragging</span>
+      Konva.inDblClickWindow = <span class="hljs-literal">true</span>;
+      clearTimeout(<span class="hljs-keyword">this</span>.dblTimeout);
+    }
+
+    <span class="hljs-keyword">this</span>.dblTimeout = setTimeout(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+      Konva.inDblClickWindow = <span class="hljs-literal">false</span>;
+    }, Konva.dblClickWindow);
+
+    <span class="hljs-keyword">if</span> (shape &amp;&amp; shape.isListening()) {
+      <span class="hljs-keyword">this</span>.clickEndShape = shape;
+      shape._fireAndBubble(MOUSEUP, { evt: evt, pointerId });
+
+      <span class="hljs-comment">// detect if click or double click occurred</span>
+      <span class="hljs-keyword">if</span> (
+        Konva.listenClickTap &amp;&amp;
+        clickStartShape &amp;&amp;
+        clickStartShape._id === shape._id
+      ) {
+        shape._fireAndBubble(CLICK, { evt: evt, pointerId });
+
+        <span class="hljs-keyword">if</span> (fireDblClick &amp;&amp; clickEndShape &amp;&amp; clickEndShape === shape) {
+          shape._fireAndBubble(DBL_CLICK, { evt: evt, pointerId });
+        }
+      }
+    } <span class="hljs-keyword">else</span> {
+      <span class="hljs-keyword">this</span>.clickEndShape = <span class="hljs-literal">null</span>;
+      <span class="hljs-keyword">this</span>._fire(MOUSEUP, {
+        evt: evt,
+        target: <span class="hljs-keyword">this</span>,
+        currentTarget: <span class="hljs-keyword">this</span>,
+        pointerId,
+      });
+      <span class="hljs-keyword">if</span> (Konva.listenClickTap) {
+        <span class="hljs-keyword">this</span>._fire(CLICK, {
+          evt: evt,
+          target: <span class="hljs-keyword">this</span>,
+          currentTarget: <span class="hljs-keyword">this</span>,
+          pointerId,
+        });
+      }
+
+      <span class="hljs-keyword">if</span> (fireDblClick) {
+        <span class="hljs-keyword">this</span>._fire(DBL_CLICK, {
+          evt: evt,
+          target: <span class="hljs-keyword">this</span>,
+          currentTarget: <span class="hljs-keyword">this</span>,
+          pointerId,
+        });
+      }
+    }
+    <span class="hljs-comment">// content events</span>
+    <span class="hljs-keyword">this</span>._fire(CONTENT_MOUSEUP, { evt: evt });
+    <span class="hljs-keyword">if</span> (Konva.listenClickTap) {
+      <span class="hljs-keyword">this</span>._fire(CONTENT_CLICK, { evt: evt });
+      <span class="hljs-keyword">if</span> (fireDblClick) {
+        <span class="hljs-keyword">this</span>._fire(CONTENT_DBL_CLICK, { evt: evt });
+      }
+    }
+
+    Konva.listenClickTap = <span class="hljs-literal">false</span>;
+
+    <span class="hljs-comment">// always call preventDefault for desktop events because some browsers</span>
+    <span class="hljs-comment">// try to drag and drop the canvas element</span>
+    <span class="hljs-keyword">if</span> (evt.cancelable) {
+      evt.preventDefault();
+    }
+  }
+</code></pre>
+<p>里面比较关键的一行代码：</p>
+<pre><code class="lang-typescript"><span class="hljs-keyword">var</span> shape = <span class="hljs-keyword">this</span>.getIntersection(<span class="hljs-keyword">this</span>.getPointerPosition())
+</code></pre>
+<p>看看 Stage 的 getIntersection 方法：</p>
+<pre><code class="lang-typescript">getIntersection(pos: Vector2d | <span class="hljs-literal">null</span>, selector?: <span class="hljs-built_in">string</span>): Shape | <span class="hljs-literal">null</span> {
+    <span class="hljs-keyword">if</span> (!pos) {
+      <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>;
+    }
+    <span class="hljs-keyword">var</span> layers = <span class="hljs-keyword">this</span>.children,
+      len = layers.length,
+      end = len - <span class="hljs-number">1</span>,
+      n,
+      shape;
+
+    <span class="hljs-keyword">for</span> (n = end; n &gt;= <span class="hljs-number">0</span>; n--) {
+      shape = layers[n].getIntersection(pos, selector);
+      <span class="hljs-keyword">if</span> (shape) {
+        <span class="hljs-keyword">return</span> shape;
+      }
+    }
+
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>;
+  }
+</code></pre>
+<p>这个方法很简单，依次调用子 layer 的 getIntersection 方法：</p>
+<p>继续看 Layer 的 getIntersection 方法：</p>
+<pre><code class="lang-typescript"><span class="hljs-keyword">var</span> 
+  <span class="hljs-comment">/*
+   * 2 - 3 - 4
+   * |       |
+   * 1 - 0   5
+   *         |
+   * 8 - 7 - 6
+   */</span>
+  INTERSECTION_OFFSETS = [
+    { x: <span class="hljs-number">0</span>, y: <span class="hljs-number">0</span> }, <span class="hljs-comment">// 0</span>
+    { x: -<span class="hljs-number">1</span>, y: -<span class="hljs-number">1</span> }, <span class="hljs-comment">// 2</span>
+    { x: <span class="hljs-number">1</span>, y: -<span class="hljs-number">1</span> }, <span class="hljs-comment">// 4</span>
+    { x: <span class="hljs-number">1</span>, y: <span class="hljs-number">1</span> }, <span class="hljs-comment">// 6</span>
+    { x: -<span class="hljs-number">1</span>, y: <span class="hljs-number">1</span> }, <span class="hljs-comment">// 8</span>
+  ]
+
+  getIntersection(pos: Vector2d, selector?: <span class="hljs-built_in">string</span>): Node | <span class="hljs-literal">null</span> {
+    <span class="hljs-keyword">if</span> (!<span class="hljs-keyword">this</span>.isListening() || !<span class="hljs-keyword">this</span>.isVisible()) {
+      <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>;
+    }
+    <span class="hljs-comment">// in some cases antialiased area may be bigger than 1px</span>
+    <span class="hljs-comment">// it is possible if we will cache node, then scale it a lot</span>
+    <span class="hljs-keyword">var</span> spiralSearchDistance = <span class="hljs-number">1</span>;
+    <span class="hljs-keyword">var</span> continueSearch = <span class="hljs-literal">false</span>;
+    <span class="hljs-keyword">while</span> (<span class="hljs-literal">true</span>) {
+      <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> i = <span class="hljs-number">0</span>; i &lt; INTERSECTION_OFFSETS_LEN; i++) {
+        <span class="hljs-keyword">const</span> intersectionOffset = INTERSECTION_OFFSETS[i];
+        <span class="hljs-keyword">const</span> obj = <span class="hljs-keyword">this</span>._getIntersection({
+          x: pos.x + intersectionOffset.x * spiralSearchDistance,
+          y: pos.y + intersectionOffset.y * spiralSearchDistance,
+        });
+        <span class="hljs-keyword">const</span> shape = obj.shape;
+        <span class="hljs-keyword">if</span> (shape &amp;&amp; selector) {
+          <span class="hljs-keyword">return</span> shape.findAncestor(selector, <span class="hljs-literal">true</span>);
+        } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (shape) {
+          <span class="hljs-keyword">return</span> shape;
+        }
+        <span class="hljs-comment">// we should continue search if we found antialiased pixel</span>
+        <span class="hljs-comment">// that means our node somewhere very close</span>
+        continueSearch = !!obj.antialiased;
+        <span class="hljs-comment">// stop search if found empty pixel</span>
+        <span class="hljs-keyword">if</span> (!obj.antialiased) {
+          <span class="hljs-keyword">break</span>;
+        }
+      }
+      <span class="hljs-comment">// if no shape, and no antialiased pixel, we should end searching</span>
+      <span class="hljs-keyword">if</span> (continueSearch) {
+        spiralSearchDistance += <span class="hljs-number">1</span>;
+      } <span class="hljs-keyword">else</span> {
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>;
+      }
+    }
+  }
+  _getIntersection(pos: Vector2d): { shape?: Shape; antialiased?: <span class="hljs-built_in">boolean</span> } {
+    <span class="hljs-keyword">const</span> ratio = <span class="hljs-keyword">this</span>.hitCanvas.pixelRatio;
+    <span class="hljs-keyword">const</span> p = <span class="hljs-keyword">this</span>.hitCanvas.context.getImageData(
+      <span class="hljs-built_in">Math</span>.round(pos.x * ratio),
+      <span class="hljs-built_in">Math</span>.round(pos.y * ratio),
+      <span class="hljs-number">1</span>,
+      <span class="hljs-number">1</span>
+    ).data;
+    <span class="hljs-keyword">const</span> p3 = p[<span class="hljs-number">3</span>];
+
+    <span class="hljs-comment">// fully opaque pixel</span>
+    <span class="hljs-keyword">if</span> (p3 === <span class="hljs-number">255</span>) {
+      <span class="hljs-keyword">const</span> colorKey = Util._rgbToHex(p[<span class="hljs-number">0</span>], p[<span class="hljs-number">1</span>], p[<span class="hljs-number">2</span>]);
+      <span class="hljs-keyword">const</span> shape = shapes[HASH + colorKey];
+      <span class="hljs-keyword">if</span> (shape) {
+        <span class="hljs-keyword">return</span> {
+          shape: shape,
+        };
+      }
+      <span class="hljs-keyword">return</span> {
+        antialiased: <span class="hljs-literal">true</span>,
+      };
+    } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (p3 &gt; <span class="hljs-number">0</span>) {
+      <span class="hljs-comment">// antialiased pixel</span>
+      <span class="hljs-keyword">return</span> {
+        antialiased: <span class="hljs-literal">true</span>,
+      };
+    }
+    <span class="hljs-comment">// empty pixel</span>
+    <span class="hljs-keyword">return</span> {};
+  }
+</code></pre>
+<p><code>_getIntersection</code> 就是最核心的实现，使用 <code>this.hitCanvas.context.getImageData</code> 获取 pixel 的颜色。然后从 shapes 里面获取对应的 shape 实例。这里要注意，有可能取到半透明的颜色，因为图形的边缘可能有抗锯齿处理。</p>
+<p>因此 <code>getIntersection</code> 针对这点做了处理，会有一个 <code>INTERSECTION_OFFSETS</code> 用于搜索当前像素的上下左右的相邻像素。因为当我们遇到一个抗锯齿像素时，完整的像素往往就在不远处。如果搜到一个像素是空的，那这个搜索流程就终止。</p>
+<h3 id="-">缓存机制</h3>
+<h3 id="transform">Transform</h3>
+<h3 id="-">动画</h3>
+<h3 id="-">性能优化机制</h3>
+</div></div><footer class="footer"><address class="author">Copyright &copy;<a rel="author" href="https://github.com/zxc0328" class="author-name">ccnuzindex</a>-<a href="https://github.com/zxc0328/diary-content.git" class="source-repo">Source</a></address><p>Generated by<a href="https://github.com/joyeecheung/diary" class="site-repo">Joyee Cheung&#39;s diary generator</a></p></footer></body></html>
