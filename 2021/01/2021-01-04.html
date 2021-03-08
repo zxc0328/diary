@@ -12,6 +12,12 @@ ga('create', 'UA-63818301-1', 'auto');
 ga('send', 'pageview');</script></head><body><header class="header"><div class="index"><a href="/diary/">Index</a></div><h1>January 4, 2021</h1></header><div class="content"><div class="diary"><h2 id="go-plan-9-">Go Plan 9 汇编</h2>
 <p>在掘金上看到一篇文章：<a href="https://www.purewhite.io/2020/10/14/manual-intelligence-optimize-golang-compiler/">使用人工智能优化 Golang 编译器
 </a> 中通过分析 Go 的汇编代码，来做性能优化。同时想起之前翻过的 《Go 语言高级编程》里面有讲 Go 汇编。其实之前对 Go 汇编的概念，没有太准确的理解。所以做了相关的学习，记录如下。</p>
+<h3 id="-">如何获取汇编？</h3>
+<p>获取 Plan9 汇编代码：</p>
+<pre><code><span class="hljs-keyword">go</span> tool compile -S xxx.<span class="hljs-keyword">go</span>
+</code></pre><p>获取目标代码（反编译二进制可执行文件）：</p>
+<pre><code><span class="hljs-keyword">go</span> tool objdump
+</code></pre><p>参考<a href="https://colobu.com/2018/12/29/get-assembly-output-for-go-programs/">得到Go程序的汇编代码的方法</a></p>
 <h3 id="-plan9-">为什么是 Plan9 汇编？</h3>
 <p>Go 使用的是 Plan9 操作系统的汇编器。因为开发 Go 语言的作者们，之前也是 Plan9 项目的主导者，所以也沿用了之前 Plan9 的一些基础设施。</p>
 <p>对于 Go 为什么使用 Plan9 汇编，以及使用 Plan9 汇编的得失，可以看<a href="https://zhuanlan.zhihu.com/p/29892487">这里</a>的一些讨论</p>
