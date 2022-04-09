@@ -44,7 +44,7 @@
     "webpack-stream": "^2.0.0"
   },
   "dependencies": {
-    "moment": "^2.10.3",
+    "moment": "^2.29.2",
     "pikaday": "^1.3.2",
     "primordials": "^1.0.0"
   },
